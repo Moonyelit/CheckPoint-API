@@ -54,3 +54,14 @@ when@test:
                 cost: 4 # Lowest possible value for bcrypt
                 time_cost: 3 # Lowest possible value for argon
                 memory_cost: 10 # Lowest possible value for argon
+
+parameters:
+    igdb.client_id: '%env(IGDB_CLIENT_ID)%'
+    igdb.client_secret: '%env(IGDB_CLIENT_SECRET)%'
+
+services:
+    App\Service\IgdbClient:
+        arguments:
+            $clientId: '%igdb.client_id%'
+            $clientSecret: '%igdb.client_secret%'
+

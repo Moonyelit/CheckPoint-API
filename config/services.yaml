@@ -1,9 +1,13 @@
+# config/services.yaml
+
 # This file is the entry point to configure your own services.
 # Files in the packages/ subdirectory configure your dependencies.
 
 # Put parameters here that don't need to change on each machine where the app is deployed
 # https://symfony.com/doc/current/best_practices.html#use-parameters-for-application-configuration
 parameters:
+    igdb.client_id: '%env(IGDB_CLIENT_ID)%'
+    igdb.client_secret: '%env(IGDB_CLIENT_SECRET)%'
 
 services:
     # default configuration for services in *this* file
@@ -20,5 +24,8 @@ services:
             - '../src/Entity/'
             - '../src/Kernel.php'
 
-    # add more service definitions when explicit configuration is needed
-    # please note that last definitions always *replace* previous ones
+    # Configuration explicite pour le client IGDB
+    App\Service\IgdbClient:
+        arguments:
+            $clientId: '%igdb.client_id%'
+            $clientSecret: '%igdb.client_secret%'
