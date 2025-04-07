@@ -33,7 +33,8 @@ use App\State\UserUpdateProcessor;
             security: "is_granted('ROLE_USER')",
             provider: MeProvider::class,
             normalizationContext: ['groups' => ['user:read']],
-            securityMessage : "Vous devez être connecté pour accéder à cette ressource"
+            securityMessage: "Vous devez être connecté pour accéder à cette ressource",
+            uriVariables: []  // Précise qu'il n'y a pas d'identifiant attendu
         ),
         new Patch(
             denormalizationContext: ['groups' => ['user:update']],
@@ -70,6 +71,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['user:write'])]
     private ?string $password = null;
 
+    #[Groups(['user:write'])]
+    private ?string $confirmPassword = null;
+
     public function getId(): ?int
     {
         return $this->id;
@@ -105,6 +109,17 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setPassword(string $password): static
     {
         $this->password = $password;
+        return $this;
+    }
+
+        public function getConfirmPassword(): ?string
+    {
+        return $this->confirmPassword;
+    }
+
+    public function setConfirmPassword(?string $confirmPassword): static
+    {
+        $this->confirmPassword = $confirmPassword;
         return $this;
     }
 

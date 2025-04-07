@@ -1,0 +1,12 @@
+# Supprimer toute importation de fichiers externes comme:
+# imports:
+#   - { resource: "@LexikJWTAuthenticationBundle/Resources/config/routes.yaml" }
+
+# Définir directement les routes nécessaires
+api_login_check:
+    path: /api/login_check
+
+# Ajoutez cette route seulement si vous utilisez le refresh token
+jwt_token_refresh:
+    path: /api/token/refresh
+    methods: ['POST']

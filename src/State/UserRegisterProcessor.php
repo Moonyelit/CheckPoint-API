@@ -21,6 +21,10 @@ class UserRegisterProcessor implements ProcessorInterface
             throw new \RuntimeException('Expected User');
         }
 
+        if ($data->getPassword() !== $data->getConfirmPassword()) {
+            throw new \RuntimeException('Les mots de passe ne correspondent pas.');
+        }
+
         $hashedPassword = $this->passwordHasher->hashPassword($data, $data->getPassword());
         $data->setPassword($hashedPassword);
 
@@ -29,4 +33,5 @@ class UserRegisterProcessor implements ProcessorInterface
 
         return $data;
     }
+
 }
