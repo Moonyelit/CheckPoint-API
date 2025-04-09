@@ -3,6 +3,8 @@
 namespace App\Entity;
 
 use App\Repository\UserRepository;
+use Doctrine\Common\Collections\ArrayCollection;
+use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use ApiPlatform\Metadata\ApiResource;
 use Symfony\Component\Serializer\Annotation\Groups;
@@ -16,6 +18,7 @@ use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use App\State\UserRegisterProcessor;
 use App\State\MeProvider;
 use App\State\UserUpdateProcessor;
+use App\Entity\StatsUserGame;
 
 #[ApiResource(
     normalizationContext: ['groups' => ['user:read']],
@@ -34,7 +37,7 @@ use App\State\UserUpdateProcessor;
             provider: MeProvider::class,
             normalizationContext: ['groups' => ['user:read']],
             securityMessage: "Vous devez être connecté pour accéder à cette ressource",
-            uriVariables: []  // Précise qu'il n'y a pas d'identifiant attendu
+            uriVariables: []
         ),
         new Patch(
             denormalizationContext: ['groups' => ['user:update']],
@@ -74,6 +77,20 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['user:write'])]
     private ?string $confirmPassword = null;
 
+    /**
+     * @var Collection<int, StatsUserGame>
+     */
+    #[ORM\OneToMany(mappedBy: 'user', targetEntity: StatsUserGame::class, orphanRemoval: true)]
+    private Collection $statsUserGames;
+
+    #[ORM\OneToOne(mappedBy: 'user', cascade: ['persist', 'remove'])]
+    private ?StatsUser $statsUser = null;
+
+    public function __construct()
+    {
+        $this->statsUserGames = new ArrayCollection();
+    }
+
     public function getId(): ?int
     {
         return $this->id;
@@ -112,7 +129,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-        public function getConfirmPassword(): ?string
+    public function getConfirmPassword(): ?string
     {
         return $this->confirmPassword;
     }
@@ -135,6 +152,50 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     public function eraseCredentials(): void
     {
-        // Si tu stockes des données temporaires sensibles, tu les effaces ici
+        // Efface les données sensibles temporaires si nécessaire
+    }
+
+    /**
+     * @return Collection<int, StatsUserGame>
+     */
+    public function getStatsUserGames(): Collection
+    {
+        return $this->statsUserGames;
+    }
+
+    public function addStatsUserGame(StatsUserGame $statsUserGame): static
+    {
+        if (!$this->statsUserGames->contains($statsUserGame)) {
+            $this->statsUserGames->add($statsUserGame);
+            $statsUserGame->setUser($this);
+        }
+        return $this;
+    }
+
+    public function removeStatsUserGame(StatsUserGame $statsUserGame): static
+    {
+        if ($this->statsUserGames->removeElement($statsUserGame)) {
+            if ($statsUserGame->getUser() === $this) {
+                $statsUserGame->setUser(null);
+            }
+        }
+        return $this;
+    }
+
+    public function getStatsUser(): ?StatsUser
+    {
+        return $this->statsUser;
+    }
+
+    public function setStatsUser(StatsUser $statsUser): static
+    {
+        // set the owning side of the relation if necessary
+        if ($statsUser->getUser() !== $this) {
+            $statsUser->setUser($this);
+        }
+
+        $this->statsUser = $statsUser;
+
+        return $this;
     }
 }

@@ -16,17 +16,15 @@ class MeProvider implements ProviderInterface
 
     public function provide(Operation $operation, array $uriVariables = [], array $context = []): object|null
     {
-
-
-        // On récupère l'utilisateur connecté
+        // Récupère l'utilisateur connecté
         $user = $this->security->getUser();
 
-        // On log pour debug si un user est bien détecté ou non
+        // Log l'identifiant de l'utilisateur ou indique qu'aucun utilisateur n'est connecté
         $this->logger->info('✅ Appel à /api/me', [
             'user' => $user ? $user->getUserIdentifier() : 'aucun utilisateur connecté'
         ]);
 
-        // On retourne l'utilisateur si présent, sinon null
+        // Retourne l'utilisateur connecté ou null
         return $user;
     }
 }

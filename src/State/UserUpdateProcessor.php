@@ -17,16 +17,18 @@ class UserUpdateProcessor implements ProcessorInterface
 
     public function process(mixed $data, Operation $operation, array $uriVariables = [], array $context = []): User
     {
+        // Vérifie que l'entité est bien un utilisateur
         if (!$data instanceof User) {
             throw new \LogicException('Mauvais type d\'entité');
         }
 
-        // Re-hash le mot de passe si modifié (optionnel)
+        // Re-hash le mot de passe si modifié
         if ($data->getPassword()) {
             $hashedPassword = $this->hasher->hashPassword($data, $data->getPassword());
             $data->setPassword($hashedPassword);
         }
 
+        // Sauvegarde l'utilisateur dans la base de données
         $this->em->persist($data);
         $this->em->flush();
 

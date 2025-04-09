@@ -1,0 +1,6 @@
+framework:
+    rate_limiter:
+        apiSearchLimit:
+            policy: 'token_bucket'
+            limit: 100
+            rate: { interval: '1 minute', amount: 100 }
