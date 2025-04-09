@@ -65,7 +65,7 @@ class IgdbClient
      * @param string $search Le mot-clé à rechercher.
      * @return array La liste des jeux correspondant à la recherche.
      */
-    public function searchGames(string $search): array
+    public function searchGames(string $search, int $limit = 50): array
     {
         $accessToken = $this->getAccessToken();
 
@@ -79,7 +79,7 @@ class IgdbClient
             'body' => <<<EOT
                 fields name, summary, cover.url, first_release_date, genres.name, platforms.name, screenshots;
                 search "$search";
-                limit 10;
+                limit $limit;
             EOT
         ]);
 
@@ -115,7 +115,6 @@ class IgdbClient
             'body' => <<<EOT
             fields url;
             where id = ($idsString);
-            limit 10;
         EOT
         ]);
 

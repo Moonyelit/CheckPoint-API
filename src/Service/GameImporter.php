@@ -155,4 +155,57 @@ class GameImporter
 
         return $game;
     }
+
+    public function importGamesBySearch(string $query): array
+    {
+        $results = $this->igdbClient->searchGames($query);
+        $importedGames = [];
+
+        foreach ($results as $apiGame) {
+            $existing = $this->gameRepository->findOneBy(['igdbId' => $apiGame['id']]);
+            if ($existing) {
+                $importedGames[] = $existing;
+                continue;
+            }
+
+            // Création d'un nouveau jeu
+            $game = new Game();
+            $game->setIgdbId($apiGame['id']);
+            $game->setTitle($apiGame['name'] ?? 'Inconnu');
+            $game->setSummary($apiGame['summary'] ?? null);
+            $game->setCoverUrl(isset($apiGame['cover']['url']) ? 'https:' . $apiGame['cover']['url'] : null);
+            $game->setTotalRating($apiGame['total_rating'] ?? null);
+
+            if (isset($apiGame['first_release_date'])) {
+                $game->setReleaseDate((new \DateTime())->setTimestamp($apiGame['first_release_date']));
+            }
+
+            $genres = isset($apiGame['genres']) ? array_map(fn($genre) => $genre['name'], $apiGame['genres']) : [];
+            $game->setGenres($genres);
+
+            $platforms = isset($apiGame['platforms']) ? array_map(fn($platform) => $platform['name'], $apiGame['platforms']) : [];
+            $game->setPlatforms($platforms);
+
+            if (isset($apiGame['involved_companies'][0]['company']['name'])) {
+                $game->setDeveloper($apiGame['involved_companies'][0]['company']['name']);
+            }
+
+            if (isset($apiGame['screenshots'])) {
+                $screens = $this->igdbClient->getScreenshots($apiGame['screenshots']);
+                foreach ($screens as $s) {
+                    $screenshot = new Screenshot();
+                    $screenshot->setImage('https:' . $s['url']);
+                    $screenshot->setGame($game);
+                    $game->addScreenshot($screenshot);
+                }
+            }
+
+            $this->entityManager->persist($game);
+            $importedGames[] = $game;
+        }
+
+        $this->entityManager->flush();
+
+        return $importedGames;
+    }
 }
