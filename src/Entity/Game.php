@@ -2,15 +2,30 @@
 
 namespace App\Entity;
 
+use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Metadata\Get;
+use ApiPlatform\Metadata\Post;
+use ApiPlatform\Metadata\Patch;
+use ApiPlatform\Metadata\Delete;
+use Symfony\Component\Serializer\Annotation\Groups;
 use App\Repository\GameRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
-
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use App\Entity\Wallpaper;
 use App\Entity\Screenshot;
 
+#[ApiResource(
+    normalizationContext: ['groups' => ['game:read']],
+    denormalizationContext: ['groups' => ['game:write']],
+    operations: [
+        new Get(),
+        new Post(security: "is_granted('ROLE_ADMIN')"),
+        new Patch(security: "is_granted('ROLE_ADMIN')"),
+        new Delete(security: "is_granted('ROLE_ADMIN')")
+    ]
+)]
 #[ORM\Entity(repositoryClass: GameRepository::class)]
 #[ORM\HasLifecycleCallbacks]
 class Game
@@ -18,53 +33,67 @@ class Game
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(['game:read'])]
     private ?int $id = null;
 
     #[ORM\Column]
+    #[Groups(['game:read', 'game:write'])]
     private ?int $igdbId = null;
 
     #[ORM\Column(length: 255)]
+    #[Groups(['game:read', 'game:write'])]
     private ?string $title = null;
 
     #[ORM\Column(type: Types::DATE_MUTABLE, nullable: true)]
+    #[Groups(['game:read', 'game:write'])]
     private ?\DateTimeInterface $releaseDate = null;
 
     #[ORM\Column(length: 255, nullable: true)]
+    #[Groups(['game:read', 'game:write'])]
     private ?string $developer = null;
 
     #[ORM\Column(nullable: true)]
+    #[Groups(['game:read', 'game:write'])]
     private ?array $platforms = null;
 
     #[ORM\Column(nullable: true)]
+    #[Groups(['game:read', 'game:write'])]
     private ?array $genres = null;
 
     #[ORM\Column(nullable: true)]
+    #[Groups(['game:read', 'game:write'])]
     private ?float $totalRating = null;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
+    #[Groups(['game:read', 'game:write'])]
     private ?string $summary = null;
 
     #[ORM\Column(length: 255, nullable: true)]
+    #[Groups(['game:read', 'game:write'])]
     private ?string $coverUrl = null;
 
     #[ORM\OneToMany(mappedBy: 'game', targetEntity: Wallpaper::class, cascade: ['persist', 'remove'])]
+    #[Groups(['game:read', 'game:write'])]
     private Collection $wallpapers;
 
     /**
      * @var Collection<int, Screenshot>
      */
     #[ORM\OneToMany(mappedBy: 'game', targetEntity: Screenshot::class, cascade: ['persist'], orphanRemoval: true)]
+    #[Groups(['game:read', 'game:write'])]
     private Collection $screenshots;
 
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
+    #[Groups(['game:read'])]
     private ?\DateTimeImmutable $createdAt = null;
 
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
-    private ?\DateTimeImmutable $updatedAt = null;    
+    #[Groups(['game:read'])]
+    private ?\DateTimeImmutable $updatedAt = null;
 
     public function __construct()
     {
-        $this->createdAt = new \DateTimeImmutable(); // Initialisation de createdAt
+        $this->createdAt = new \DateTimeImmutable();
         $this->wallpapers = new ArrayCollection();
         $this->screenshots = new ArrayCollection();
     }
@@ -233,10 +262,9 @@ class Game
 
     public function addScreenshot(Screenshot $screenshot): static
     {
-        // Vérifie s'il y a déjà un screenshot avec la même image (ou critère pertinent)
         foreach ($this->screenshots as $existing) {
             if ($existing->getImage() === $screenshot->getImage()) {
-                return $this; // Déjà présent, on ne l'ajoute pas
+                return $this;
             }
         }
 
@@ -249,7 +277,6 @@ class Game
     public function removeScreenshot(Screenshot $screenshot): static
     {
         if ($this->screenshots->removeElement($screenshot)) {
-            // set the owning side to null (unless already changed)
             if ($screenshot->getGame() === $this) {
                 $screenshot->setGame(null);
             }

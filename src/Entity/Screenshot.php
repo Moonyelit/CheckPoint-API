@@ -2,43 +2,54 @@
 
 namespace App\Entity;
 
+use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Metadata\Get;
+use ApiPlatform\Metadata\Post;
+use ApiPlatform\Metadata\Delete;
+use Symfony\Component\Serializer\Annotation\Groups;
 use App\Repository\ScreenshotRepository;
 use Doctrine\ORM\Mapping as ORM;
-
 use App\Entity\Game;
 
-/**
- * Classe représentant une entité Screenshot dans la base de données.
- * @ORM\Entity(repositoryClass=ScreenshotRepository::class)
- */
+#[ApiResource(
+    normalizationContext: ['groups' => ['screenshot:read']],
+    denormalizationContext: ['groups' => ['screenshot:write']],
+    operations: [
+        new Get(),
+        new Post(security: "is_granted('ROLE_ADMIN')"),
+        new Delete(security: "is_granted('ROLE_ADMIN')")
+    ]
+)]
 #[ORM\Entity(repositoryClass: ScreenshotRepository::class)]
 #[ORM\HasLifecycleCallbacks]
 class Screenshot
 {
-    // Identifiant unique de l'entité (clé primaire).
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(['screenshot:read'])]
     private ?int $id = null;
 
-    // Chemin ou nom de l'image associée au screenshot.
     #[ORM\Column(length: 255, nullable: true)]
+    #[Groups(['screenshot:read', 'screenshot:write'])]
     private ?string $image = null;
 
-    // Relation ManyToOne avec l'entité Game (un jeu peut avoir plusieurs screenshots).
     #[ORM\ManyToOne(inversedBy: 'screenshots')]
     #[ORM\JoinColumn(nullable: false)]
+    #[Groups(['screenshot:read', 'screenshot:write'])]
     private ?Game $game = null;
 
     #[ORM\Column]
+    #[Groups(['screenshot:read'])]
     private ?\DateTimeImmutable $createdAt = null;
 
     #[ORM\Column(nullable: true)]
+    #[Groups(['screenshot:read'])]
     private ?\DateTimeImmutable $updatedAt = null;
 
     public function __construct()
     {
-        $this->createdAt = new \DateTimeImmutable(); // Initialisation de createdAt
+        $this->createdAt = new \DateTimeImmutable();
     }
 
     #[ORM\PrePersist]
