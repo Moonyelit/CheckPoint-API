@@ -1,6 +1,15 @@
 framework:
     rate_limiter:
+        # Limiter qui protège la route de login
+        login_limiter:
+            policy: 'sliding_window'
+            limit: 5
+            interval: '1 minute'
+
+        # Limiter pour les requêtes de recherche API
         apiSearchLimit:
             policy: 'token_bucket'
             limit: 100
-            rate: { interval: '1 minute', amount: 100 }
+            rate:
+                amount: 100
+                interval: '1 minute'

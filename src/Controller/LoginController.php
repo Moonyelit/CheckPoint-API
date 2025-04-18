@@ -12,19 +12,33 @@ use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\Exception\UserNotFoundException;
-
+use Symfony\Component\RateLimiter\RateLimiterFactory;
+use Symfony\Component\RateLimiter\RateLimitExceededException;
 
 class LoginController
 {
     public function __construct(
         private UserProviderInterface $userProvider,
         private JWTTokenManagerInterface $jwtManager,
-        private UserPasswordHasherInterface $passwordHasher
+        private UserPasswordHasherInterface $passwordHasher,
+        private RateLimiterFactory $loginLimiterFactory
     ) {}
 
     public function __invoke(Request $request): JsonResponse
     {
         try {
+            // Rate limiting
+            $limiter = $this->loginLimiterFactory->create($request->getClientIp());
+            $limit = $limiter->consume();
+            if (!$limit->isAccepted()) {
+                $retryAfter = $limit->getRetryAfter()->getTimestamp() - time();
+                return new JsonResponse(
+                    ['error' => 'Trop de tentatives, réessayez plus tard.'],
+                    JsonResponse::HTTP_TOO_MANY_REQUESTS,
+                    ['Retry-After' => $retryAfter]
+                );
+            }
+
             $data = json_decode($request->getContent(), true);
             if (json_last_error() !== JSON_ERROR_NONE) {
                 return new JsonResponse(['error' => 'Format JSON invalide'], JsonResponse::HTTP_BAD_REQUEST);
