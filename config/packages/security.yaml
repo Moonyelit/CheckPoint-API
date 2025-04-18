@@ -11,10 +11,10 @@ security:
                 property: email
     firewalls:
         login:
-            pattern: ^/api/login
+            pattern: ^/api/login_check$  # Modifier ici
             stateless: true
             json_login:
-                check_path: /api/login_check
+                check_path: /api/login_check  # Et ici
                 username_path: email
                 success_handler: lexik_jwt_authentication.handler.authentication_success
                 failure_handler: lexik_jwt_authentication.handler.authentication_failure

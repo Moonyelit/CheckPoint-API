@@ -10,7 +10,7 @@ use App\Controller\LoginController;
 #[ApiResource(
     collectionOperations: [
         'post' => [
-            'path' => '/login_check',
+            'path' => '/api/login_check',
             'controller' => LoginController::class,
             'read' => false,
             'validate' => true,
