@@ -10,7 +10,8 @@ use Symfony\Component\Console\Output\OutputInterface;
 
 
 // Pour récupérer les 500 jeux les plus populaires, 
-// faire dans le termine: php bin/console app:import-games
+// faire dans le terminal: 
+// php bin/console app:import-games
 
 
 

@@ -4,6 +4,7 @@ namespace App\Entity;
 
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
+use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Post;
 use ApiPlatform\Metadata\Patch;
 use ApiPlatform\Metadata\Delete;
@@ -15,15 +16,54 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use App\Entity\Wallpaper;
 use App\Entity\Screenshot;
+use App\Controller\TopGamesByYearAction;
 
 #[ApiResource(
     normalizationContext: ['groups' => ['game:read']],
     denormalizationContext: ['groups' => ['game:write']],
     operations: [
+        // GET /api/games
+        new GetCollection(),
+
+        // GET /api/games/top/{year}?limit=5
+        new GetCollection(
+            uriTemplate: '/games/top/{year}',
+            controller: TopGamesByYearAction::class,
+            read: false,
+            paginationEnabled: false,
+            extraProperties: [
+                'swagger_context' => [
+                    'summary' => 'Retourne le top des jeux par note pour une année donnée',
+                    'parameters' => [
+                        [
+                            'name' => 'year',
+                            'in' => 'path',
+                            'required' => true,
+                            'schema' => ['type' => 'integer'],
+                            'description' => 'Année de sortie (ex. 2025)',
+                        ],
+                        [
+                            'name' => 'limit',
+                            'in' => 'query',
+                            'required' => false,
+                            'schema' => ['type' => 'integer', 'default' => 5],
+                            'description' => 'Nombre maximal de jeux à renvoyer',
+                        ],
+                    ],
+                    'responses' => [
+                        '200' => ['description' => 'Liste des jeux triés par note'],
+                    ],
+                ]
+            ]
+        ),
+
+        // GET /api/games/{id}
         new Get(),
+
+        // Opérations CRUD réservées aux admins
         new Post(security: "is_granted('ROLE_ADMIN')"),
         new Patch(security: "is_granted('ROLE_ADMIN')"),
-        new Delete(security: "is_granted('ROLE_ADMIN')")
+        new Delete(security: "is_granted('ROLE_ADMIN')"),
     ]
 )]
 #[ORM\Entity(repositoryClass: GameRepository::class)]

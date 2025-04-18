@@ -49,4 +49,25 @@ class GameRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /**
+     * Retourne les $limit meilleurs jeux sortis en $year.
+     *
+     * @return Game[]
+     */
+    public function findTopRatedByYear(int $year, int $limit = 5): array
+    {
+        $start = new \DateTimeImmutable("$year-01-01 00:00:00");
+        $end   = new \DateTimeImmutable("$year-12-31 23:59:59");
+
+        return $this->createQueryBuilder('g')
+            ->andWhere('g.releaseDate BETWEEN :start AND :end')
+            ->andWhere('g.totalRating IS NOT NULL')
+            ->setParameter('start', $start)
+            ->setParameter('end',   $end)
+            ->orderBy('g.totalRating', 'DESC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
 }

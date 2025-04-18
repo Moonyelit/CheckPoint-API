@@ -14,6 +14,7 @@ use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 
 use App\Service\GameImporter;
 use App\Repository\GameRepository;
+use Symfony\Component\HttpFoundation\Request;
 
 class GameController extends AbstractController
 {
@@ -78,4 +79,5 @@ class GameController extends AbstractController
         // Retourne les jeux trouvés ou importés
         return $this->json($games, 200, [], ['groups' => 'game:read']);
     }
+
 }
