@@ -31,9 +31,7 @@ services:
             $clientSecret: '%igdb.client_secret%'
 
     # Une seule configuration du LoginController
-    App\Controller\LoginController:
-        arguments:
-            $loginLimiterFactory: '@limiter.login_limiter'
+    App\Controller\LoginController: ~
 
     # Configuration pour le LoginRateLimiter
     App\Security\LoginRateLimiter:
