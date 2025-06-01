@@ -17,6 +17,7 @@ use Doctrine\Common\Collections\Collection;
 use App\Entity\Wallpaper;
 use App\Entity\Screenshot;
 use App\Controller\TopGamesByYearAction;
+use App\Controller\TrendingGamesAction;
 
 #[ApiResource(
     normalizationContext: ['groups' => ['game:read']],
@@ -52,6 +53,31 @@ use App\Controller\TopGamesByYearAction;
                     ],
                     'responses' => [
                         '200' => ['description' => 'Liste des jeux triés par note'],
+                    ],
+                ]
+            ]
+        ),
+
+        // GET /api/games/trending?limit=5
+        new GetCollection(
+            uriTemplate: '/games/trending',
+            controller: TrendingGamesAction::class,
+            read: false,
+            paginationEnabled: false,
+            extraProperties: [
+                'swagger_context' => [
+                    'summary' => 'Retourne les jeux populaires du moment',
+                    'parameters' => [
+                        [
+                            'name' => 'limit',
+                            'in' => 'query',
+                            'required' => false,
+                            'schema' => ['type' => 'integer', 'default' => 5],
+                            'description' => 'Nombre maximal de jeux à renvoyer',
+                        ],
+                    ],
+                    'responses' => [
+                        '200' => ['description' => 'Liste des jeux populaires du moment'],
                     ],
                 ]
             ]

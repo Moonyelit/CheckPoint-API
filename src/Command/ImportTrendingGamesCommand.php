@@ -8,22 +8,15 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
-
-// Pour récupérer les 500 jeux les plus populaires de tous les temps, 
-// faire dans le terminal dans le dossier CheckPoint-API : 
-// php bin/console app:import-games
-// 
-// Pour récupérer les jeux populaires du moment (tendance), utiliser:
+// Pour récupérer les jeux populaires du moment (tendance), 
+// faire dans le terminal: 
 // php bin/console app:import-trending-games
 
-
-
 #[AsCommand(
-    name: 'app:import-games',
-    description: 'Importe les jeux les plus populaires de tous les temps depuis IGDB',
+    name: 'app:import-trending-games',
+    description: 'Importe les jeux populaires du moment depuis IGDB',
 )]
-class ImportGamesCommand extends Command
-
+class ImportTrendingGamesCommand extends Command
 {
     private GameImporter $importer;
 
@@ -35,12 +28,12 @@ class ImportGamesCommand extends Command
 
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $output->writeln('<info>Démarrage de l\'import des jeux les plus populaires IGDB...</info>');
+        $output->writeln('<info>Démarrage de l\'import des jeux populaires du moment IGDB...</info>');
 
-        $this->importer->importPopularGames();
+        $this->importer->importTrendingGames();
 
-        $output->writeln('<info>Import terminé avec succès !</info>');
+        $output->writeln('<info>Import des jeux tendance terminé avec succès !</info>');
 
         return Command::SUCCESS;
     }
-}
+} 

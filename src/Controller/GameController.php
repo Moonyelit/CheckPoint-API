@@ -62,6 +62,15 @@ class GameController extends AbstractController
         return new Response('Import terminé !');
     }
 
+    #[Route('/admin/import-trending-games', name: 'admin_import_trending_games')]
+    public function importTrendingGames(GameImporter $importer): Response
+    {
+        // Importe les jeux populaires du moment.
+        $importer->importTrendingGames();
+    
+        return new Response('Import des jeux tendance terminé !');
+    }
+
     #[Route('/api/games/search-or-import/{query}', name: 'api_game_search_or_import')]
     public function searchGame(string $query, GameImporter $gameImporter, GameRepository $gameRepository): JsonResponse
     {
@@ -78,6 +87,70 @@ class GameController extends AbstractController
 
         // Retourne les jeux trouvés ou importés
         return $this->json($games, 200, [], ['groups' => 'game:read']);
+    }
+
+    #[Route('/api/games/improve-image-quality', name: 'api_improve_image_quality', methods: ['POST'])]
+    public function improveImageQuality(Request $request, IgdbClient $igdb): JsonResponse
+    {
+        $data = json_decode($request->getContent(), true);
+        
+        if (!isset($data['imageUrl'])) {
+            return $this->json(['error' => 'imageUrl est requis'], 400);
+        }
+        
+        $originalUrl = $data['imageUrl'];
+        $size = $data['size'] ?? 't_1080p'; // taille par défaut
+        
+        $improvedUrl = $igdb->improveImageQuality($originalUrl, $size);
+        
+        return $this->json([
+            'originalUrl' => $originalUrl,
+            'improvedUrl' => $improvedUrl,
+            'availableSizes' => [
+                't_cover_small' => 'Petite couverture (90x128)',
+                't_cover_big' => 'Grande couverture (264x374)', 
+                't_720p' => 'HD 720p',
+                't_1080p' => 'Full HD 1080p',
+                't_original' => 'Taille originale'
+            ]
+        ]);
+    }
+
+    #[Route('/admin/update-existing-images', name: 'admin_update_existing_images')]
+    public function updateExistingImages(GameRepository $gameRepository, IgdbClient $igdb): Response
+    {
+        // Récupère tous les jeux avec une coverUrl
+        $games = $gameRepository->createQueryBuilder('g')
+            ->where('g.coverUrl IS NOT NULL')
+            ->andWhere('g.coverUrl != :empty')
+            ->setParameter('empty', '')
+            ->getQuery()
+            ->getResult();
+
+        $updatedCount = 0;
+
+        foreach ($games as $game) {
+            $originalUrl = $game->getCoverUrl();
+            
+            // Vérifie si l'image n'est pas déjà en haute qualité
+            if (strpos($originalUrl, 't_cover_big') === false && 
+                strpos($originalUrl, 't_1080p') === false && 
+                strpos($originalUrl, 't_original') === false) {
+                
+                $improvedUrl = $igdb->improveImageQuality($originalUrl, 't_cover_big');
+                
+                if ($improvedUrl !== $originalUrl) {
+                    $game->setCoverUrl($improvedUrl);
+                    $game->setUpdatedAt(new \DateTimeImmutable());
+                    $updatedCount++;
+                }
+            }
+        }
+
+        // Sauvegarde en base
+        $gameRepository->getEntityManager()->flush();
+
+        return new Response("Mise à jour terminée ! {$updatedCount} images améliorées.");
     }
 
 }

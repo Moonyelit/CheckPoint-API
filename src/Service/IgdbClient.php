@@ -83,8 +83,17 @@ class IgdbClient
             EOT
         ]);
 
+        $games = $response->toArray();
+        
+        // Améliore la qualité des images de couverture
+        foreach ($games as &$game) {
+            if (isset($game['cover']['url'])) {
+                $game['cover']['url'] = $this->improveImageQuality($game['cover']['url'], 't_cover_big');
+            }
+        }
+
         // Retourne les résultats sous forme de tableau
-        return $response->toArray();
+        return $games;
     }
 
     /**
@@ -118,8 +127,17 @@ class IgdbClient
         EOT
         ]);
 
+        $screenshots = $response->toArray();
+        
+        // Améliore la qualité des captures d'écran
+        foreach ($screenshots as &$screenshot) {
+            if (isset($screenshot['url'])) {
+                $screenshot['url'] = $this->improveImageQuality($screenshot['url'], 't_1080p');
+            }
+        }
+
         // Retourne les résultats sous forme de tableau
-        return $response->toArray();
+        return $screenshots;
     }
 
     /**
@@ -150,7 +168,100 @@ class IgdbClient
             EOT
         ]);
 
+        $games = $response->toArray();
+        
+        // Améliore la qualité des images de couverture
+        foreach ($games as &$game) {
+            if (isset($game['cover']['url'])) {
+                $game['cover']['url'] = $this->improveImageQuality($game['cover']['url'], 't_cover_big');
+            }
+        }
+
         // Retourne les résultats sous forme de tableau
-        return $response->toArray();
+        return $games;
+    }
+
+    /**
+     * Récupère les jeux populaires du moment.
+     *
+     * Cette méthode récupère les jeux récents (sortis dans les 2 dernières semaines)
+     * avec une bonne note et un niveau de hype élevé, représentant les tendances actuelles.
+     *
+     * @return array La liste des jeux populaires du moment.
+     */
+    public function getTrendingGames(): array
+    {
+        $accessToken = $this->getAccessToken();
+
+        // Calcule les timestamps pour les 2 dernières semaines
+        $twoWeeksAgo = (new \DateTime('-2 weeks'))->getTimestamp();
+        $now = (new \DateTime())->getTimestamp();
+
+        // Effectue une requête POST pour récupérer les jeux tendance
+        $response = $this->client->request('POST', 'https://api.igdb.com/v4/games', [
+            'headers' => [
+                'Client-ID' => $this->clientId,
+                'Authorization' => 'Bearer ' . $accessToken,
+                'Content-Type' => 'text/plain',
+            ],
+            'body' => <<<EOT
+            fields name, summary, cover.url, first_release_date, genres.name, platforms.name, screenshots, total_rating, hypes, involved_companies.company.name;
+            sort hypes desc;
+            where first_release_date >= $twoWeeksAgo & first_release_date <= $now & total_rating >= 70 & hypes != null;
+            limit 500;
+            EOT
+        ]);
+
+        $games = $response->toArray();
+        
+        // Améliore la qualité des images de couverture
+        foreach ($games as &$game) {
+            if (isset($game['cover']['url'])) {
+                $game['cover']['url'] = $this->improveImageQuality($game['cover']['url'], 't_cover_big');
+            }
+        }
+
+        return $games;
+    }
+
+    /**
+     * Améliore la qualité d'une URL d'image IGDB.
+     *
+     * @param string $url L'URL originale de l'image
+     * @param string $size La taille désirée (t_1080p, t_720p, t_cover_big, etc.)
+     * @return string L'URL avec la nouvelle taille
+     */
+    public function improveImageQuality(string $url, string $size = 't_1080p'): string
+    {
+        // Vérifie si l'URL contient déjà la taille demandée pour éviter les doublons
+        if (strpos($url, $size) !== false) {
+            return $url;
+        }
+
+        // Vérifie si l'image est déjà en haute qualité
+        $highQualityPatterns = ['t_cover_big', 't_1080p', 't_720p', 't_original'];
+        foreach ($highQualityPatterns as $pattern) {
+            if (strpos($url, $pattern) !== false) {
+                return $url; // Déjà en haute qualité, pas besoin de modifier
+            }
+        }
+
+        // Remplace les tailles de basse qualité par la taille désirée
+        $patterns = [
+            '/t_thumb/', '/t_micro/', '/t_cover_small/', '/t_screenshot_med/', '/t_cover_small_2x/'
+        ];
+        
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $url)) {
+                return preg_replace($pattern, $size, $url);
+            }
+        }
+        
+        // Si aucun pattern trouvé et que c'est une image IGDB, ajoute la taille
+        if (strpos($url, 'images.igdb.com') !== false && strpos($url, '.jpg') !== false) {
+            return str_replace('.jpg', '_' . $size . '.jpg', $url);
+        }
+        
+        return $url;
     }
 }
