@@ -16,8 +16,8 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use App\Entity\Wallpaper;
 use App\Entity\Screenshot;
-use App\Controller\TopGamesByYearAction;
-use App\Controller\TrendingGamesAction;
+use App\Controller\Top100GamesAction;
+use App\Controller\TopYearGamesAction;
 
 #[ApiResource(
     normalizationContext: ['groups' => ['game:read']],
@@ -26,23 +26,16 @@ use App\Controller\TrendingGamesAction;
         // GET /api/games
         new GetCollection(),
 
-        // GET /api/games/top/{year}?limit=5
+        // GET /api/games/top100?limit=5
         new GetCollection(
-            uriTemplate: '/games/top/{year}',
-            controller: TopGamesByYearAction::class,
+            uriTemplate: '/games/top100',
+            controller: Top100GamesAction::class,
             read: false,
             paginationEnabled: false,
             extraProperties: [
                 'swagger_context' => [
-                    'summary' => 'Retourne le top des jeux par note pour une année donnée',
+                    'summary' => 'Retourne les jeux du Top 100 d\'IGDB',
                     'parameters' => [
-                        [
-                            'name' => 'year',
-                            'in' => 'path',
-                            'required' => true,
-                            'schema' => ['type' => 'integer'],
-                            'description' => 'Année de sortie (ex. 2025)',
-                        ],
                         [
                             'name' => 'limit',
                             'in' => 'query',
@@ -52,21 +45,21 @@ use App\Controller\TrendingGamesAction;
                         ],
                     ],
                     'responses' => [
-                        '200' => ['description' => 'Liste des jeux triés par note'],
+                        '200' => ['description' => 'Liste des jeux du Top 100 IGDB'],
                     ],
                 ]
             ]
         ),
 
-        // GET /api/games/trending?limit=5
+        // GET /api/games/top100-year?limit=5
         new GetCollection(
-            uriTemplate: '/games/trending',
-            controller: TrendingGamesAction::class,
+            uriTemplate: '/games/top100-year',
+            controller: TopYearGamesAction::class,
             read: false,
             paginationEnabled: false,
             extraProperties: [
                 'swagger_context' => [
-                    'summary' => 'Retourne les jeux populaires du moment',
+                    'summary' => 'Retourne les meilleurs jeux de l\'année (365 derniers jours)',
                     'parameters' => [
                         [
                             'name' => 'limit',
@@ -77,7 +70,7 @@ use App\Controller\TrendingGamesAction;
                         ],
                     ],
                     'responses' => [
-                        '200' => ['description' => 'Liste des jeux populaires du moment'],
+                        '200' => ['description' => 'Liste des meilleurs jeux de l\'année'],
                     ],
                 ]
             ]
@@ -156,6 +149,22 @@ class Game
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
     #[Groups(['game:read'])]
     private ?\DateTimeImmutable $updatedAt = null;
+
+    #[ORM\Column(nullable: true)]
+    #[Groups(['game:read', 'game:write'])]
+    private ?int $recentHypes = null;
+
+    #[ORM\Column(nullable: true)]
+    #[Groups(['game:read', 'game:write'])]
+    private ?int $follows = null;
+
+    #[ORM\Column(nullable: true)]
+    #[Groups(['game:read', 'game:write'])]
+    private ?int $totalRatingCount = null;
+
+    #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
+    #[Groups(['game:read'])]
+    private ?\DateTimeImmutable $lastPopularityUpdate = null;
 
     public function __construct()
     {
@@ -371,6 +380,54 @@ class Game
     public function setUpdatedAt(?\DateTimeImmutable $updatedAt): static
     {
         $this->updatedAt = $updatedAt;
+
+        return $this;
+    }
+
+    public function getRecentHypes(): ?int
+    {
+        return $this->recentHypes;
+    }
+
+    public function setRecentHypes(?int $recentHypes): static
+    {
+        $this->recentHypes = $recentHypes;
+
+        return $this;
+    }
+
+    public function getFollows(): ?int
+    {
+        return $this->follows;
+    }
+
+    public function setFollows(?int $follows): static
+    {
+        $this->follows = $follows;
+
+        return $this;
+    }
+
+    public function getTotalRatingCount(): ?int
+    {
+        return $this->totalRatingCount;
+    }
+
+    public function setTotalRatingCount(?int $totalRatingCount): static
+    {
+        $this->totalRatingCount = $totalRatingCount;
+
+        return $this;
+    }
+
+    public function getLastPopularityUpdate(): ?\DateTimeImmutable
+    {
+        return $this->lastPopularityUpdate;
+    }
+
+    public function setLastPopularityUpdate(?\DateTimeImmutable $lastPopularityUpdate): static
+    {
+        $this->lastPopularityUpdate = $lastPopularityUpdate;
 
         return $this;
     }

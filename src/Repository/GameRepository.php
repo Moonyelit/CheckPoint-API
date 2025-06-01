@@ -51,21 +51,42 @@ class GameRepository extends ServiceEntityRepository
     }
 
     /**
-     * Retourne les $limit meilleurs jeux sortis en $year.
+     * Retourne les jeux du Top 100.
+     * Filtre les jeux avec au moins 50 votes et trie par note pondérée.
      *
      * @return Game[]
      */
-    public function findTopRatedByYear(int $year, int $limit = 5): array
+    public function findTop100Games(int $limit = 5): array
     {
-        $start = new \DateTimeImmutable("$year-01-01 00:00:00");
-        $end   = new \DateTimeImmutable("$year-12-31 23:59:59");
+        return $this->createQueryBuilder('g')
+            ->andWhere('g.totalRating IS NOT NULL')
+            ->andWhere('g.totalRatingCount >= 50') // Filtrage minimum 50 votes
+            ->orderBy('g.totalRating', 'DESC')
+            ->addOrderBy('g.totalRatingCount', 'DESC')
+            ->addOrderBy('g.follows', 'DESC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Retourne les meilleurs jeux sortis dans les 365 derniers jours.
+     * Trie par totalRating décroissant.
+     *
+     * @return Game[]
+     */
+    public function findTopYearGames(int $limit = 5): array
+    {
+        $oneYearAgo = new \DateTimeImmutable('-365 days');
 
         return $this->createQueryBuilder('g')
-            ->andWhere('g.releaseDate BETWEEN :start AND :end')
+            ->andWhere('g.releaseDate >= :oneYearAgo')
             ->andWhere('g.totalRating IS NOT NULL')
-            ->setParameter('start', $start)
-            ->setParameter('end',   $end)
+            ->andWhere('g.totalRating >= 75')
+            ->andWhere('g.totalRatingCount >= 100') // Minimum 100 votes pour garantir la qualité
+            ->setParameter('oneYearAgo', $oneYearAgo)
             ->orderBy('g.totalRating', 'DESC')
+            ->addOrderBy('g.totalRatingCount', 'DESC')
             ->setMaxResults($limit)
             ->getQuery()
             ->getResult();

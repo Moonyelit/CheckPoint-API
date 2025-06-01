@@ -182,22 +182,24 @@ class IgdbClient
     }
 
     /**
-     * Récupère les jeux populaires du moment.
+     * Récupère les jeux du Top 100 d'IGDB.
      *
-     * Cette méthode récupère les jeux récents (sortis dans les 2 dernières semaines)
-     * avec une bonne note et un niveau de hype élevé, représentant les tendances actuelles.
+     * Cette méthode récupère les vrais hits récents et AAA classiques :
+     * - Jeux très récents (2024-2025) comme Clair Obscur avec critères souples
+     * - Jeux récents populaires (2018+) comme Baldur's Gate 3, Elden Ring
+     * - AAA classiques avec beaucoup de votes
      *
-     * @return array La liste des jeux populaires du moment.
+     * @return array La liste des jeux du top 100.
      */
-    public function getTrendingGames(): array
+    public function getTop100Games(): array
     {
         $accessToken = $this->getAccessToken();
 
-        // Calcule les timestamps pour les 2 dernières semaines
-        $twoWeeksAgo = (new \DateTime('-2 weeks'))->getTimestamp();
-        $now = (new \DateTime())->getTimestamp();
+        // Calcul des dates (timestamp Unix)
+        $year2024 = (new \DateTime('2024-01-01'))->getTimestamp();
+        $year2018 = (new \DateTime('2018-01-01'))->getTimestamp();
 
-        // Effectue une requête POST pour récupérer les jeux tendance
+        // Effectue une requête POST pour récupérer les jeux du top 100
         $response = $this->client->request('POST', 'https://api.igdb.com/v4/games', [
             'headers' => [
                 'Client-ID' => $this->clientId,
@@ -205,10 +207,55 @@ class IgdbClient
                 'Content-Type' => 'text/plain',
             ],
             'body' => <<<EOT
-            fields name, summary, cover.url, first_release_date, genres.name, platforms.name, screenshots, total_rating, hypes, involved_companies.company.name;
-            sort hypes desc;
-            where first_release_date >= $twoWeeksAgo & first_release_date <= $now & total_rating >= 70 & hypes != null;
-            limit 500;
+            fields name, summary, cover.url, first_release_date, genres.name, platforms.name, screenshots, total_rating, total_rating_count, involved_companies.company.name;
+            sort total_rating desc;
+            where (first_release_date >= $year2024 & total_rating >= 80 & total_rating_count >= 5) | (first_release_date >= $year2018 & total_rating >= 88 & total_rating_count >= 50) | (total_rating >= 85 & total_rating_count >= 1000);
+            limit 100;
+            EOT
+        ]);
+
+        $games = $response->toArray();
+        
+        // Améliore la qualité des images de couverture
+        foreach ($games as &$game) {
+            if (isset($game['cover']['url'])) {
+                $game['cover']['url'] = $this->improveImageQuality($game['cover']['url'], 't_cover_big');
+            }
+        }
+
+        return $games;
+    }
+
+    /**
+     * Récupère les meilleurs jeux sortis dans les 365 derniers jours.
+     *
+     * Cette méthode récupère les jeux récents les mieux notés :
+     * - Jeux sortis dans les 365 derniers jours
+     * - Note minimum 75/100 et au moins 10 votes
+     * - Triés par note décroissante
+     *
+     * @return array La liste des jeux de l'année.
+     */
+    public function getTopYearGames(): array
+    {
+        $accessToken = $this->getAccessToken();
+
+        // Calcul de la date pour les 365 derniers jours (timestamp Unix)
+        $oneYearAgo = (new \DateTime('-365 days'))->getTimestamp();
+        $now = (new \DateTime())->getTimestamp();
+
+        // Effectue une requête POST pour récupérer les jeux de l'année
+        $response = $this->client->request('POST', 'https://api.igdb.com/v4/games', [
+            'headers' => [
+                'Client-ID' => $this->clientId,
+                'Authorization' => 'Bearer ' . $accessToken,
+                'Content-Type' => 'text/plain',
+            ],
+            'body' => <<<EOT
+            fields name, summary, cover.url, first_release_date, genres.name, platforms.name, screenshots, total_rating, total_rating_count, involved_companies.company.name;
+            sort total_rating desc;
+            where first_release_date >= $oneYearAgo & first_release_date <= $now & total_rating >= 75 & total_rating_count >= 10;
+            limit 50;
             EOT
         ]);
 

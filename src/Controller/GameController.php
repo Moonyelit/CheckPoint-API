@@ -16,6 +16,44 @@ use App\Service\GameImporter;
 use App\Repository\GameRepository;
 use Symfony\Component\HttpFoundation\Request;
 
+/**
+ * 🎮 CONTRÔLEUR PRINCIPAL - GESTION GLOBALE DES JEUX
+ * 
+ * Ce contrôleur central gère toutes les opérations principales liées aux jeux :
+ * recherche, import, gestion des images, et routes d'administration.
+ * 
+ * 🔧 FONCTIONNALITÉS PRINCIPALES :
+ * 
+ * 🔍 RECHERCHE :
+ * - /api/games/search/{name} : Recherche API avec rate limiting
+ * - /games/search/{query} : Vue Twig pour affichage frontend
+ * - /api/games/search-or-import/{query} : Recherche intelligente avec import auto
+ * 
+ * 📥 IMPORT ADMIN :
+ * - /admin/import-popular-games : Import jeux populaires
+ * - /admin/import-top100-games : Import Top 100 IGDB
+ * - /admin/import-top-year-games : Import jeux de l'année
+ * 
+ * 🖼️ GESTION IMAGES :
+ * - /api/games/improve-image-quality : API amélioration qualité
+ * - /admin/update-existing-images : Mise à jour batch des images
+ * 
+ * 🔒 SÉCURITÉ :
+ * - Rate limiting sur les recherches API (évite spam)
+ * - Routes admin protégées par rôles
+ * - Gestion d'erreurs robuste avec fallbacks
+ * 
+ * 🎯 UTILISATION :
+ * - Point central pour toutes les opérations sur les jeux
+ * - Interface entre frontend et services métier
+ * - Routes d'administration pour la maintenance
+ * 
+ * 💡 ARCHITECTURE :
+ * - Injection de dépendances (IgdbClient, GameImporter, etc.)
+ * - Délégation vers services spécialisés
+ * - Réponses JSON pour API, vues Twig pour pages
+ */
+
 class GameController extends AbstractController
 {
     private LimiterInterface $limiter;
@@ -62,13 +100,22 @@ class GameController extends AbstractController
         return new Response('Import terminé !');
     }
 
-    #[Route('/admin/import-trending-games', name: 'admin_import_trending_games')]
-    public function importTrendingGames(GameImporter $importer): Response
+    #[Route('/admin/import-top100-games', name: 'admin_import_top100_games')]
+    public function importTop100Games(GameImporter $importer): Response
     {
-        // Importe les jeux populaires du moment.
-        $importer->importTrendingGames();
+        // Importe les jeux du Top 100 d'IGDB.
+        $importer->importTop100Games();
     
-        return new Response('Import des jeux tendance terminé !');
+        return new Response('Import du Top 100 IGDB terminé !');
+    }
+
+    #[Route('/admin/import-top-year-games', name: 'admin_import_top_year_games')]
+    public function importTopYearGames(GameImporter $importer): Response
+    {
+        // Importe les meilleurs jeux de l'année (365 derniers jours).
+        $count = $importer->importTopYearGames();
+    
+        return new Response("Import des jeux de l'année terminé ! {$count} jeux traités.");
     }
 
     #[Route('/api/games/search-or-import/{query}', name: 'api_game_search_or_import')]
