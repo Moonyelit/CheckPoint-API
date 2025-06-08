@@ -15,6 +15,7 @@ use ApiPlatform\Metadata\Delete;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
+use Symfony\Component\Validator\Constraints as Assert;
 use App\State\UserRegisterProcessor;
 use App\State\MeProvider;
 use App\State\UserUpdateProcessor;
@@ -64,17 +65,36 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(length: 15)]
     #[Groups(['user:read', 'user:write'])]
+    #[Assert\NotBlank(message: 'Le pseudo est obligatoire')]
+    #[Assert\Length(
+        min: 3,
+        max: 15,
+        minMessage: 'Le pseudo doit contenir au moins {{ limit }} caractères',
+        maxMessage: 'Le pseudo ne peut pas dépasser {{ limit }} caractères'
+    )]
+    #[Assert\Regex(
+        pattern: '/^[a-zA-Z0-9_-]+$/',
+        message: 'Le pseudo ne peut contenir que des lettres, chiffres, tirets et underscores'
+    )]
     private ?string $pseudo = null;
 
     #[ORM\Column(length: 255, unique: true)]
     #[Groups(['user:read', 'user:write'])]
+    #[Assert\NotBlank(message: 'L\'email est obligatoire')]
+    #[Assert\Email(message: 'L\'email n\'est pas valide')]
     private ?string $email = null;
 
     #[ORM\Column(length: 255)]
     #[Groups(['user:write'])]
+    #[Assert\NotBlank(message: 'Le mot de passe est obligatoire')]
+    #[Assert\Length(
+        min: 8,
+        minMessage: 'Le mot de passe doit contenir au moins {{ limit }} caractères'
+    )]
     private ?string $password = null;
 
     #[Groups(['user:write'])]
+    #[Assert\NotBlank(message: 'La confirmation du mot de passe est obligatoire')]
     private ?string $confirmPassword = null;
 
     /**

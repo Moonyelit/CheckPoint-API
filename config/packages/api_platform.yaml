@@ -2,6 +2,10 @@ api_platform:
     title: CheckPoint - API
     description: API pour mon site  appelée CheckPoint
     version: 1.0.0
+    formats:
+        jsonld: ['application/ld+json']
+        json: ['application/json']
+        html: ['text/html']
     swagger:
         api_keys:
             JWT:
