@@ -97,6 +97,10 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Assert\NotBlank(message: 'La confirmation du mot de passe est obligatoire')]
     private ?string $confirmPassword = null;
 
+    #[ORM\Column(type: 'boolean', options: ['default' => false])]
+    #[Groups(['user:read'])]
+    private bool $emailVerified = false;
+
     /**
      * @var Collection<int, StatsUserGame>
      */
@@ -216,6 +220,17 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
         $this->statsUser = $statsUser;
 
+        return $this;
+    }
+
+    public function isEmailVerified(): bool
+    {
+        return $this->emailVerified;
+    }
+
+    public function setEmailVerified(bool $emailVerified): self
+    {
+        $this->emailVerified = $emailVerified;
         return $this;
     }
 }
