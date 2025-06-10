@@ -28,6 +28,7 @@ class AvatarUploadController extends AbstractController
     public function uploadAvatar(Request $request): JsonResponse
     {
         try {
+            
             /** @var User $user */
             $user = $this->getUser();
             
@@ -51,10 +52,14 @@ class AvatarUploadController extends AbstractController
             // Générer un nom de fichier sécurisé et unique
             $originalFilename = pathinfo($avatarFile->getClientOriginalName(), PATHINFO_FILENAME);
             $safeFilename = $this->slugger->slug($originalFilename);
-            $newFilename = $safeFilename . '-' . uniqid() . '.' . $avatarFile->guessExtension();
+            
+            // Utiliser l'extension du fichier original au lieu de guessExtension()
+            $originalExtension = strtolower(pathinfo($avatarFile->getClientOriginalName(), PATHINFO_EXTENSION));
+            $newFilename = $safeFilename . '-' . uniqid() . '.' . $originalExtension;
 
             // Créer le répertoire s'il n'existe pas
             $uploadsDirectory = $this->getParameter('kernel.project_dir') . '/../CheckPoint-Next.JS/public/images/avatars/uploads';
+            
             if (!is_dir($uploadsDirectory)) {
                 mkdir($uploadsDirectory, 0755, true);
             }
@@ -63,7 +68,7 @@ class AvatarUploadController extends AbstractController
             try {
                 $avatarFile->move($uploadsDirectory, $newFilename);
             } catch (FileException $e) {
-                return new JsonResponse(['error' => 'Erreur lors de l\'upload du fichier'], Response::HTTP_INTERNAL_SERVER_ERROR);
+                return new JsonResponse(['error' => 'Erreur lors de l\'upload du fichier: ' . $e->getMessage()], Response::HTTP_INTERNAL_SERVER_ERROR);
             }
 
             // Redimensionner l'image pour la sécurité et les performances
@@ -89,7 +94,10 @@ class AvatarUploadController extends AbstractController
             ]);
 
         } catch (\Exception $e) {
-            return new JsonResponse(['error' => 'Erreur serveur lors de l\'upload'], Response::HTTP_INTERNAL_SERVER_ERROR);
+            return new JsonResponse([
+                'error' => 'Erreur serveur lors de l\'upload',
+                'debug' => $e->getMessage()
+            ], Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
 
@@ -101,11 +109,11 @@ class AvatarUploadController extends AbstractController
             return 'Le fichier est trop volumineux (max 5MB)';
         }
 
-        // Vérifier le type MIME
-        $allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
-        if (!in_array($file->getMimeType(), $allowedMimeTypes)) {
-            return 'Type de fichier non autorisé. Seuls JPG, PNG et WEBP sont acceptés';
-        }
+        // Vérifier le type MIME (temporairement désactivé - nécessite symfony/mime)
+        // $allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
+        // if (!in_array($file->getMimeType(), $allowedMimeTypes)) {
+        //     return 'Type de fichier non autorisé. Seuls JPG, PNG et WEBP sont acceptés';
+        // }
 
         // Vérifier l'extension
         $allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];

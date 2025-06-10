@@ -26,6 +26,7 @@
         "symfony/http-client": "7.2.*",
         "symfony/lock": "7.2.*",
         "symfony/maker-bundle": "^1.62",
+        "symfony/mime": "7.2.*",
         "symfony/property-access": "7.2.*",
         "symfony/property-info": "7.2.*",
         "symfony/rate-limiter": "7.2.*",
