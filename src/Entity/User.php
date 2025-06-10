@@ -101,6 +101,15 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['user:read'])]
     private bool $emailVerified = false;
 
+    #[ORM\Column(length: 500, nullable: true)]
+    #[Groups(['user:read', 'user:update'])]
+    #[Assert\Url(message: 'L\'URL de l\'image de profil n\'est pas valide')]
+    #[Assert\Regex(
+        pattern: '/^\/images\/avatars\/[a-zA-Z0-9_-]+\.(png|jpg|jpeg|webp|svg)$/',
+        message: 'L\'image de profil doit être un chemin valide vers /images/avatars/ avec une extension autorisée'
+    )]
+    private ?string $profileImage = '/images/avatars/DefaultAvatar.JPG';
+
     /**
      * @var Collection<int, StatsUserGame>
      */
@@ -113,6 +122,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function __construct()
     {
         $this->statsUserGames = new ArrayCollection();
+        $this->profileImage = '/images/avatars/DefaultAvatar.JPG';
     }
 
     public function getId(): ?int
@@ -161,6 +171,18 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setConfirmPassword(?string $confirmPassword): static
     {
         $this->confirmPassword = $confirmPassword;
+        return $this;
+    }
+
+    public function getProfileImage(): ?string
+    {
+        return $this->profileImage;
+    }
+
+    public function setProfileImage(?string $profileImage): static
+    {
+        // La validation sera faite par le AvatarSecurityService dans le processor
+        $this->profileImage = $profileImage ?? '/images/avatars/DefaultAvatar.JPG';
         return $this;
     }
 
