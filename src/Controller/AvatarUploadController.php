@@ -109,11 +109,13 @@ class AvatarUploadController extends AbstractController
             return 'Le fichier est trop volumineux (max 5MB)';
         }
 
-        // Vérifier le type MIME (temporairement désactivé - nécessite symfony/mime)
-        // $allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
-        // if (!in_array($file->getMimeType(), $allowedMimeTypes)) {
-        //     return 'Type de fichier non autorisé. Seuls JPG, PNG et WEBP sont acceptés';
-        // }
+        // Vérifier le type MIME avec finfo (fonction PHP native)
+        $allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp'];
+        $detectedMimeType = $this->detectMimeType($file->getPathname());
+        
+        if (!in_array($detectedMimeType, $allowedMimeTypes)) {
+            return 'Type de fichier non autorisé. Seuls JPG, PNG et WEBP sont acceptés. Détecté: ' . $detectedMimeType;
+        }
 
         // Vérifier l'extension
         $allowedExtensions = ['jpg', 'jpeg', 'png', 'webp'];
@@ -206,5 +208,42 @@ class AvatarUploadController extends AbstractController
                 unlink($filePath);
             }
         }
+    }
+
+    /**
+     * Détecte le type MIME d'un fichier en utilisant finfo (fonction PHP native)
+     */
+    private function detectMimeType(string $filePath): string
+    {
+        // Vérifier si l'extension fileinfo est disponible
+        if (!extension_loaded('fileinfo')) {
+            // Fallback vers une détection basique si fileinfo n'est pas disponible
+            return $this->detectMimeTypeBasic($filePath);
+        }
+
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        if ($finfo === false) {
+            return $this->detectMimeTypeBasic($filePath);
+        }
+
+        $mimeType = finfo_file($finfo, $filePath);
+        finfo_close($finfo);
+
+        return $mimeType ?: 'application/octet-stream';
+    }
+
+    /**
+     * Détection MIME basique en cas de problème avec finfo
+     */
+    private function detectMimeTypeBasic(string $filePath): string
+    {
+        $extension = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+        
+        return match($extension) {
+            'jpg', 'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'webp' => 'image/webp',
+            default => 'application/octet-stream'
+        };
     }
 } 
