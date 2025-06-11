@@ -28,7 +28,7 @@ use App\Entity\StatsUserGame;
         new Post(
             uriTemplate: '/register',
             denormalizationContext: ['groups' => ['user:write']],
-            validationContext: ['groups' => ['Default']],
+            validationContext: ['groups' => ['Default', 'user:create']],
             security: "is_granted('PUBLIC_ACCESS')",
             processor: UserRegisterProcessor::class
         ),
@@ -43,6 +43,7 @@ use App\Entity\StatsUserGame;
         new Patch(
             denormalizationContext: ['groups' => ['user:update']],
             normalizationContext: ['groups' => ['user:read']],
+            validationContext: ['groups' => ['Default', 'user:update']],
             security: "is_granted('ROLE_USER') and object == user",
             processor: UserUpdateProcessor::class,
             securityMessage: "Vous ne pouvez modifier que votre propre compte"
@@ -94,7 +95,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?string $password = null;
 
     #[Groups(['user:write'])]
-    #[Assert\NotBlank(message: 'La confirmation du mot de passe est obligatoire')]
+    #[Assert\NotBlank(message: 'La confirmation du mot de passe est obligatoire', groups: ['user:create'])]
     private ?string $confirmPassword = null;
 
     #[ORM\Column(type: 'boolean', options: ['default' => false])]
@@ -103,9 +104,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(length: 500, nullable: true)]
     #[Groups(['user:read', 'user:update'])]
-    #[Assert\Url(message: 'L\'URL de l\'image de profil n\'est pas valide')]
     #[Assert\Regex(
-        pattern: '/^\/images\/avatars\/[a-zA-Z0-9_-]+\.(png|jpg|jpeg|webp|svg)$/',
+        pattern: '/^\/images\/avatars\/(uploads\/)?[a-zA-Z0-9_.-]+\.(png|jpg|jpeg|webp|svg|JPG)$/i',
         message: 'L\'image de profil doit être un chemin valide vers /images/avatars/ avec une extension autorisée'
     )]
     private ?string $profileImage = '/images/avatars/DefaultAvatar.JPG';
