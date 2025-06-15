@@ -85,12 +85,25 @@ class AvatarUploadController extends AbstractController
 
             // Mettre à jour l'utilisateur
             $user->setProfileImage($validatedUrl);
+            
+            // S'assurer que les données sensibles sont préservées
+            $user->setPassword($user->getPassword());
+            $user->setEmail($user->getEmail());
+            $user->setEmailVerified($user->isEmailVerified());
+            
             $this->entityManager->flush();
 
             return new JsonResponse([
                 'success' => true,
                 'avatarUrl' => $validatedUrl,
-                'message' => 'Avatar uploadé avec succès'
+                'message' => 'Avatar uploadé avec succès',
+                'user' => [
+                    'id' => $user->getId(),
+                    'email' => $user->getEmail(),
+                    'pseudo' => $user->getPseudo(),
+                    'emailVerified' => $user->isEmailVerified(),
+                    'profileImage' => $user->getProfileImage()
+                ]
             ]);
 
         } catch (\Exception $e) {

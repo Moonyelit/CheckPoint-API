@@ -47,9 +47,14 @@ class EmailVerificationController extends AbstractController
 
         // Rediriger vers le frontend Next.js avec succès
         $frontendUrl = $_ENV['NEXT_PUBLIC_BASE_URL'] ?? 'http://localhost:3000';
-        return $this->redirect(
-            $frontendUrl . '/inscription?verified=true&email=' . urlencode($email)
+        $redirectUrl = sprintf(
+            '%s/connexion?verified=true&email=%s&message=%s',
+            $frontendUrl,
+            urlencode($email),
+            urlencode('Votre email a été vérifié avec succès. Vous pouvez maintenant vous connecter.')
         );
+
+        return $this->redirect($redirectUrl);
     }
 
     #[Route('/api/verify-email/error', name: 'verification_error', methods: ['GET'])]

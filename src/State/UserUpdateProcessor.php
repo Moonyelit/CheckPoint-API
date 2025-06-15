@@ -22,8 +22,19 @@ class UserUpdateProcessor implements ProcessorInterface
             throw new \LogicException('Mauvais type d\'entité');
         }
 
+        // Récupérer l'utilisateur existant
+        $existingUser = $this->em->getRepository(User::class)->find($data->getId());
+        if (!$existingUser) {
+            throw new \LogicException('Utilisateur non trouvé');
+        }
+
+        // Préserver les données sensibles
+        $data->setPassword($existingUser->getPassword());
+        $data->setEmail($existingUser->getEmail());
+        $data->setEmailVerified($existingUser->isEmailVerified());
+
         // Re-hash le mot de passe si modifié
-        if ($data->getPassword()) {
+        if ($data->getPassword() && $data->getPassword() !== $existingUser->getPassword()) {
             $hashedPassword = $this->hasher->hashPassword($data, $data->getPassword());
             $data->setPassword($hashedPassword);
         }
