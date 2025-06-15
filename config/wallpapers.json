@@ -1,0 +1,93 @@
+{
+  "wallpapers": [
+    {
+      "filename": "Nier.gif",
+      "path": "/images/Animate/Nier.gif",
+      "game": {
+        "igdbId": 11208,
+        "title": "NieR:Automata",
+        "releaseDate": "2017-03-07",
+        "developer": "PlatinumGames",
+        "platforms": [
+          "PlayStation 4",
+          "PC",
+          "Nintendo Switch",
+          "Xbox One"
+        ],
+        "genres": [
+          "Action RPG",
+          "Hack and slash",
+          "Role-playing"
+        ],
+        "totalRating": 89,
+        "summary": "NieR:Automata tells the story of androids 2B, 9S and A2 and their battle to reclaim the machine-driven dystopia overrun by powerful machines.",
+        "coverUrl": "https://images.igdb.com/igdb/image/upload/t_cover_big/co5pcj.jpg",
+        "comment": "Un chef-d'œuvre d'action-RPG avec une narration profonde et une bande-son exceptionnelle"
+      }
+    },
+    {
+      "filename": "Pokemon-WhiteBlack.gif",
+      "path": "/images/Animate/Pokemon-WhiteBlack.gif",
+      "game": {
+        "igdbId": 1521,
+        "title": "Pokémon Black Version",
+        "releaseDate": "2010-09-18",
+        "developer": "Game Freak",
+        "platforms": [
+          "Nintendo DS"
+        ],
+        "genres": [
+          "Role-playing",
+          "Turn-based strategy"
+        ],
+        "totalRating": 87,
+        "summary": "Pokémon Black Version is one of the first games in the fifth generation of Pokémon games. It features a new region called Unova, with 156 new Pokémon.",
+        "coverUrl": "https://images.igdb.com/igdb/image/upload/t_cover_big/co1z1x.jpg",
+        "comment": "Une aventure captivante dans la région d'Unys"
+      }
+    },
+    {
+      "filename": "Pokemon-WhiteBlack.gif",
+      "path": "/images/Animate/Pokemon-WhiteBlack.gif",
+      "game": {
+        "igdbId": 1522,
+        "title": "Pokémon White Version",
+        "releaseDate": "2010-09-18",
+        "developer": "Game Freak",
+        "platforms": [
+          "Nintendo DS"
+        ],
+        "genres": [
+          "Role-playing",
+          "Turn-based strategy"
+        ],
+        "totalRating": 87,
+        "summary": "Pokémon White Version is one of the first games in the fifth generation of Pokémon games. It features a new region called Unova, with 156 new Pokémon.",
+        "coverUrl": "https://images.igdb.com/igdb/image/upload/t_cover_big/co1z21.jpg",
+        "comment": "Une aventure captivante dans la région d'Unys"
+      }
+    },
+    {
+      "filename": "TheLastUs2.gif",
+      "path": "/images/Animate/TheLastUs2.gif",
+      "game": {
+        "igdbId": 26192,
+        "title": "The Last of Us Part II",
+        "releaseDate": "2020-06-19",
+        "developer": "Naughty Dog",
+        "platforms": [
+          "PlayStation 4",
+          "PlayStation 5"
+        ],
+        "genres": [
+          "Action-adventure",
+          "Survival horror"
+        ],
+        "totalRating": 93,
+        "summary": "The Last of Us Part II is an action-adventure game played from a third-person perspective. Players use firearms, improvised weapons, and stealth to defend against hostile humans and cannibalistic creatures infected by a mutated strain of the Cordyceps fungus.",
+        "coverUrl": "https://images.igdb.com/igdb/image/upload/t_cover_big/co5ziw.jpg",
+        "comment": "Une suite épique qui repousse les limites du storytelling dans les jeux vidéo"
+      }
+    }
+  ]
+}
