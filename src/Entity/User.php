@@ -41,6 +41,15 @@ use App\Entity\StatsUserGame;
             uriVariables: []
         ),
         new Patch(
+            uriTemplate: '/me',
+            denormalizationContext: ['groups' => ['user:update']],
+            normalizationContext: ['groups' => ['user:read']],
+            validationContext: ['groups' => ['Default', 'user:update']],
+            security: "is_granted('ROLE_USER')",
+            processor: UserUpdateProcessor::class,
+            securityMessage: "Vous devez être connecté pour modifier votre profil"
+        ),
+        new Patch(
             denormalizationContext: ['groups' => ['user:update']],
             normalizationContext: ['groups' => ['user:read']],
             validationContext: ['groups' => ['Default', 'user:update']],
@@ -66,37 +75,41 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
 
     #[ORM\Column(length: 15)]
     #[Groups(['user:read', 'user:write'])]
-    #[Assert\NotBlank(message: 'Le pseudo est obligatoire')]
+    #[Assert\NotBlank(message: 'Le pseudo est obligatoire', groups: ['user:create'])]
     #[Assert\Length(
         min: 3,
         max: 15,
         minMessage: 'Le pseudo doit contenir au moins {{ limit }} caractères',
-        maxMessage: 'Le pseudo ne peut pas dépasser {{ limit }} caractères'
+        maxMessage: 'Le pseudo ne peut pas dépasser {{ limit }} caractères',
+        groups: ['user:create']
     )]
     #[Assert\Regex(
         pattern: '/^[a-zA-Z0-9_-]+$/',
-        message: 'Le pseudo ne peut contenir que des lettres, chiffres, tirets et underscores'
+        message: 'Le pseudo ne peut contenir que des lettres, chiffres, tirets et underscores',
+        groups: ['user:create']
     )]
     private ?string $pseudo = null;
 
     #[ORM\Column(length: 255, unique: true)]
     #[Groups(['user:read', 'user:write'])]
-    #[Assert\NotBlank(message: 'L\'email est obligatoire')]
-    #[Assert\Email(message: 'L\'email n\'est pas valide')]
+    #[Assert\NotBlank(message: 'L\'email est obligatoire', groups: ['user:create'])]
+    #[Assert\Email(message: 'L\'email n\'est pas valide', groups: ['user:create'])]
     private ?string $email = null;
 
     #[ORM\Column(length: 255)]
     #[Groups(['user:write'])]
-    #[Assert\NotBlank(message: 'Le mot de passe est obligatoire')]
+    #[Assert\NotBlank(message: 'Le mot de passe est obligatoire', groups: ['user:create'])]
     #[Assert\Length(
         min: 12,
-        minMessage: 'Le mot de passe doit contenir au moins {{ limit }} caractères'
+        minMessage: 'Le mot de passe doit contenir au moins {{ limit }} caractères',
+        groups: ['user:create']
     )]
     #[Assert\Regex(
         pattern: '/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{12,}$/',
-        message: 'Le mot de passe doit contenir au moins une majuscule, une minuscule, un chiffre et un caractère spécial'
+        message: 'Le mot de passe doit contenir au moins une majuscule, une minuscule, un chiffre et un caractère spécial',
+        groups: ['user:create']
     )]
-    #[Assert\NotCompromisedPassword(message: 'Ce mot de passe a été compromis dans une fuite de données. Veuillez en choisir un autre.')]
+    #[Assert\NotCompromisedPassword(message: 'Ce mot de passe a été compromis dans une fuite de données. Veuillez en choisir un autre.', groups: ['user:create'])]
     private ?string $password = null;
 
     #[Groups(['user:write'])]
@@ -104,16 +117,21 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?string $confirmPassword = null;
 
     #[ORM\Column(type: 'boolean', options: ['default' => false])]
-    #[Groups(['user:read'])]
+    #[Groups(['user:read', 'user:update'])]
     private bool $emailVerified = false;
 
     #[ORM\Column(length: 500, nullable: true)]
     #[Groups(['user:read', 'user:update'])]
     #[Assert\Regex(
         pattern: '/^\/images\/avatars\/(uploads\/)?[a-zA-Z0-9_.-]+\.(png|jpg|jpeg|webp|svg|JPG)$/i',
-        message: 'L\'image de profil doit être un chemin valide vers /images/avatars/ avec une extension autorisée'
+        message: 'L\'image de profil doit être un chemin valide vers /images/avatars/ avec une extension autorisée',
+        groups: ['user:update']
     )]
     private ?string $profileImage = '/images/avatars/DefaultAvatar.JPG';
+
+    #[ORM\Column(type: 'boolean', options: ['default' => false])]
+    #[Groups(['user:read', 'user:update'])]
+    private bool $tutorialCompleted = false;
 
     /**
      * @var Collection<int, StatsUserGame>
@@ -258,6 +276,17 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function setEmailVerified(bool $emailVerified): self
     {
         $this->emailVerified = $emailVerified;
+        return $this;
+    }
+
+    public function isTutorialCompleted(): bool
+    {
+        return $this->tutorialCompleted;
+    }
+
+    public function setTutorialCompleted(bool $tutorialCompleted): self
+    {
+        $this->tutorialCompleted = $tutorialCompleted;
         return $this;
     }
 }
