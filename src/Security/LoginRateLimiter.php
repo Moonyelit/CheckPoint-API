@@ -6,29 +6,31 @@ use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RateLimiter\RequestRateLimiterInterface;
 use Symfony\Component\RateLimiter\RateLimiterFactory;
 use Symfony\Component\RateLimiter\RateLimit;
+use Symfony\Component\Security\Core\Exception\CustomUserMessageAuthenticationException;
 
 class LoginRateLimiter implements RequestRateLimiterInterface
 {
-    public function __construct(
-        private RateLimiterFactory $factory
-    ) {}
+    private $limiter;
+
+    public function __construct(RateLimiterFactory $factory)
+    {
+        $this->limiter = $factory;
+    }
 
     public function consume(Request $request): RateLimit
     {
-        // identifiant unique par IP + email (pour isoler chaque utilisateur)
-        $key = $request->getClientIp()
-            . '|' . ($request->request->get('email') ?? '');
+        $limiter = $this->limiter->create($request->getClientIp());
+        $limit = $limiter->consume(1);
+        
+        if (false === $limit->isAccepted()) {
+            throw new CustomUserMessageAuthenticationException('Trop de tentatives de connexion. Veuillez réessayer dans quelques minutes.');
+        }
 
-        // consomme une unité dans le rate‐limiter configuré
-        return $this->factory->create($key)->consume();
+        return $limit;
     }
 
     public function reset(Request $request): void
     {
-        $key = $request->getClientIp()
-            . '|' . ($request->request->get('email') ?? '');
-
-        // réinitialise le compteur (utile en cas de succès, si tu veux remettre à zéro)
-        $this->factory->create($key)->reset();
+        $this->limiter->create($request->getClientIp())->reset();
     }
 }

@@ -39,9 +39,29 @@ services:
             $factory: '@limiter.login_limiter'
 
     # Configuration du CustomAuthenticationFailureHandler
-    App\Security\CustomAuthenticationFailureHandler: ~
+    App\Security\CustomAuthenticationFailureHandler:
+        autowire: true
+        autoconfigure: true
 
     # Configuration du AuthenticationSuccessListener pour JWT
     App\EventListener\AuthenticationSuccessListener:
         tags:
             - { name: kernel.event_listener, event: lexik_jwt_authentication.on_authentication_success, method: onAuthenticationSuccessResponse }
+
+    # Configuration du gestionnaire de succès d'authentification JWT
+    lexik_jwt_authentication.handler.authentication_success:
+        class: Lexik\Bundle\JWTAuthenticationBundle\Security\Http\Authentication\AuthenticationSuccessHandler
+        arguments:
+            - '@lexik_jwt_authentication.jwt_manager'
+            - '@event_dispatcher'
+            - '@lexik_jwt_authentication.extractor.chain_extractor'
+            - false
+        tags:
+            - { name: 'kernel.event_listener', event: 'lexik_jwt_authentication.on_authentication_success', method: 'onAuthenticationSuccessResponse' }
+
+    App\Security\AuthenticationSuccessHandler:
+        arguments:
+            - '@lexik_jwt_authentication.jwt_manager'
+            - '@event_dispatcher'
+        tags:
+            - { name: 'kernel.event_listener', event: 'lexik_jwt_authentication.on_authentication_success', method: 'onAuthenticationSuccess' }

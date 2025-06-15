@@ -89,9 +89,14 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[Groups(['user:write'])]
     #[Assert\NotBlank(message: 'Le mot de passe est obligatoire')]
     #[Assert\Length(
-        min: 8,
+        min: 12,
         minMessage: 'Le mot de passe doit contenir au moins {{ limit }} caractères'
     )]
+    #[Assert\Regex(
+        pattern: '/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{12,}$/',
+        message: 'Le mot de passe doit contenir au moins une majuscule, une minuscule, un chiffre et un caractère spécial'
+    )]
+    #[Assert\NotCompromisedPassword(message: 'Ce mot de passe a été compromis dans une fuite de données. Veuillez en choisir un autre.')]
     private ?string $password = null;
 
     #[Groups(['user:write'])]

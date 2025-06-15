@@ -13,3 +13,11 @@ framework:
             rate:
                 amount: 100
                 interval: '1 minute'
+
+        login:
+            policy: 'sliding_window'
+            limit: 5
+            interval: '15 minutes'
+            rate:
+                amount: 5
+                interval: '15 minutes'

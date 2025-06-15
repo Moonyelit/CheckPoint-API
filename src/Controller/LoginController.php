@@ -36,7 +36,6 @@ class LoginController
             throw new BadCredentialsException('Identifiants invalides.');
         }
 
-        // Vérification des identifiants
         if (!$user instanceof PasswordAuthenticatedUserInterface) {
             throw new \LogicException("L'utilisateur ne gère pas de mot de passe.");
         }
@@ -45,7 +44,6 @@ class LoginController
             throw new BadCredentialsException("Identifiants invalides.");
         }
 
-        // Vérification que l'utilisateur est bien une instance de notre classe User
         if (!$user instanceof User) {
             throw new \LogicException("Type d'utilisateur invalide.");
         }
@@ -55,15 +53,15 @@ class LoginController
         
         // Construction de la réponse avec toutes les données utilisateur nécessaires
         return new JsonResponse([
-            'token' => $token, // Token JWT pour l'authentification
-            'user'  => [
-                'id' => $user->getId(), // ID unique de l'utilisateur
-                'email' => $user->getEmail(), // Email de l'utilisateur
-                'pseudo' => $user->getPseudo(), // Pseudo de l'utilisateur
-                'emailVerified' => $user->isEmailVerified(), // Statut de vérification de l'email
-                'profileImage' => $user->getProfileImage(), // URL de l'image de profil
-                'roles' => $user->getRoles() // Rôles de l'utilisateur
+            'token' => $token,
+            'user' => [
+                'id' => $user->getId(),
+                'email' => $user->getEmail(),
+                'pseudo' => $user->getPseudo(),
+                'emailVerified' => $user->isEmailVerified(),
+                'profileImage' => $user->getProfileImage(),
+                'roles' => $user->getRoles()
             ]
-        ]);
+        ], JsonResponse::HTTP_OK);
     }
 }

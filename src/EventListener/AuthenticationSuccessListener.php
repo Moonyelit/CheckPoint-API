@@ -17,14 +17,24 @@ class AuthenticationSuccessListener
             return;
         }
 
-        // Ajouter les données utilisateur à la réponse JWT
-        $data['user'] = [
-            'id' => $user->getId(),
-            'email' => $user->getEmail(),
-            'pseudo' => $user->getPseudo(),
-            'emailVerified' => $user->isEmailVerified()
+        // S'assurer que le token est présent
+        if (!isset($data['token'])) {
+            return;
+        }
+
+        // Construire la réponse complète
+        $response = [
+            'token' => $data['token'],
+            'user' => [
+                'id' => $user->getId(),
+                'email' => $user->getEmail(),
+                'pseudo' => $user->getPseudo(),
+                'emailVerified' => $user->isEmailVerified(),
+                'profileImage' => $user->getProfileImage(),
+                'roles' => $user->getRoles()
+            ]
         ];
 
-        $event->setData($data);
+        $event->setData($response);
     }
 } 
