@@ -18,6 +18,8 @@ use App\Entity\Wallpaper;
 use App\Entity\Screenshot;
 use App\Controller\Top100GamesAction;
 use App\Controller\TopYearGamesAction;
+use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
+use ApiPlatform\Metadata\ApiFilter;
 
 #[ApiResource(
     normalizationContext: ['groups' => ['game:read']],
@@ -85,6 +87,7 @@ use App\Controller\TopYearGamesAction;
         new Delete(security: "is_granted('ROLE_ADMIN')"),
     ]
 )]
+#[ApiFilter(SearchFilter::class, properties: ['title' => 'partial'])]
 #[ORM\Entity(repositoryClass: GameRepository::class)]
 #[ORM\HasLifecycleCallbacks]
 class Game
