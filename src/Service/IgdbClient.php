@@ -4,6 +4,47 @@ namespace App\Service;
 
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
+/**
+ * 🎮 SERVICE IGDB CLIENT - INTERFACE AVANCÉE AVEC L'API IGDB
+ *
+ * Ce service centralise toutes les interactions avec l'API IGDB (Internet Game Database)
+ * pour la récupération, la recherche et l'amélioration des données de jeux vidéo.
+ *
+ * 🔧 FONCTIONNALITÉS PRINCIPALES :
+ *
+ * 🔍 RECHERCHE & RÉCUPÉRATION :
+ * - Recherche de jeux par mot-clé (titre, etc.)
+ * - Récupération des jeux populaires, top 100, jeux récents, etc.
+ * - Pagination et gestion des résultats volumineux
+ *
+ * 🖼️ OPTIMISATION DES IMAGES :
+ * - Amélioration automatique de la qualité des images de couverture et screenshots
+ * - Conversion des URLs pour obtenir la meilleure résolution possible
+ *
+ * 🔒 SÉCURITÉ & PERFORMANCE :
+ * - Gestion intelligente du token d'accès OAuth (Twitch)
+ * - Réutilisation du token pour limiter les appels
+ * - Gestion des erreurs et fallback
+ *
+ * 🎯 UTILISATION :
+ * - Utilisé par les services d'import, de recherche et d'affichage frontend
+ * - Permet d'enrichir dynamiquement la base locale avec des données IGDB
+ * - Complète les recherches utilisateur en temps réel
+ *
+ * ⚡ EXEMPLES D'USAGE :
+ * - Import massif de jeux (top 100, populaires, récents)
+ * - Recherche dynamique lors d'une requête utilisateur
+ * - Amélioration de la qualité d'affichage des images sur le frontend
+ *
+ * 💡 AVANTAGES :
+ * - Centralisation de toute la logique IGDB
+ * - Facile à maintenir et à étendre
+ * - Optimisé pour la performance et la qualité des données
+ *
+ * 🔧 UTILISATION RECOMMANDÉE :
+ * - Pour tout accès à IGDB (import, recherche, enrichissement)
+ * - Pour garantir la cohérence et la qualité des données jeux
+ */
 class IgdbClient
 {
     private HttpClientInterface $client;
@@ -63,9 +104,11 @@ class IgdbClient
      * Recherche des jeux dans l'API IGDB en fonction d'un mot-clé.
      *
      * @param string $search Le mot-clé à rechercher.
+     * @param int $limit Le nombre de résultats par page
+     * @param int $offset L'offset pour la pagination
      * @return array La liste des jeux correspondant à la recherche.
      */
-    public function searchGames(string $search, int $limit = 50): array
+    public function searchGames(string $search, int $limit = 30, int $offset = 0): array
     {
         $accessToken = $this->getAccessToken();
 
@@ -80,6 +123,7 @@ class IgdbClient
                 fields name, summary, cover.url, first_release_date, genres.name, platforms.name, screenshots;
                 search "$search";
                 limit $limit;
+                offset $offset;
             EOT
         ]);
 

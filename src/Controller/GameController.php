@@ -65,7 +65,7 @@ class GameController extends AbstractController
     }
 
     #[Route('/api/games/search/{name}', name: 'api_game_search')]
-    public function search(string $name, IgdbClient $igdb): JsonResponse
+    public function search(string $name, Request $request, IgdbClient $igdb): JsonResponse
     {
         // Limite les requêtes API.
         $limit = $this->limiter->consume();
@@ -74,9 +74,22 @@ class GameController extends AbstractController
             throw new TooManyRequestsHttpException('Trop de requêtes.');
         }
 
-        // Recherche des jeux via IGDB.
-        $games = $igdb->searchGames($name);
-        return $this->json($games);
+        // Récupère les paramètres de pagination
+        $page = max(1, (int) $request->query->get('page', 1));
+        $limit = 30;
+        $offset = ($page - 1) * $limit;
+
+        // Recherche des jeux via IGDB avec pagination
+        $games = $igdb->searchGames($name, $limit, $offset);
+        
+        return $this->json([
+            'games' => $games,
+            'pagination' => [
+                'currentPage' => $page,
+                'limit' => $limit,
+                'offset' => $offset
+            ]
+        ]);
     }
 
     #[Route('/games/search/{query}', name: 'games_search')]

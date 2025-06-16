@@ -4,6 +4,46 @@ namespace App\Service;
 
 use Symfony\Component\Security\Core\Exception\InvalidArgumentException;
 
+/**
+ * 🛡️ SERVICE AVATAR SECURITY - SÉCURISATION & VALIDATION DES AVATARS UTILISATEUR
+ *
+ * Ce service centralise toutes les vérifications, nettoyages et sécurisations
+ * des chemins d'avatars utilisateurs pour garantir la sécurité et l'intégrité des données.
+ *
+ * 🔧 FONCTIONNALITÉS PRINCIPALES :
+ *
+ * 🔒 VALIDATION & NETTOYAGE :
+ * - Validation stricte des chemins d'avatars (format, extension, longueur)
+ * - Nettoyage des chemins pour éviter les attaques XSS et path traversal
+ * - Filtrage des extensions autorisées (png, jpg, jpeg, webp, svg)
+ *
+ * 🖼️ GESTION DES AVATARS PAR DÉFAUT :
+ * - Fournit un avatar par défaut sécurisé si le chemin est invalide ou absent
+ * - Liste des avatars par défaut disponibles
+ *
+ * 🛡️ SÉCURITÉ AVANCÉE :
+ * - Vérification de l'existence physique (optionnelle)
+ * - Génération d'en-têtes CSP pour les images
+ * - Validation des headers de sécurité lors des requêtes
+ *
+ * 🎯 UTILISATION :
+ * - Utilisé lors de l'upload, de l'affichage ou de la modification d'un avatar utilisateur
+ * - Garantit que seuls des chemins sûrs et valides sont utilisés côté frontend et backend
+ *
+ * ⚡ EXEMPLES D'USAGE :
+ * - Nettoyage automatique lors de l'enregistrement d'un profil
+ * - Sécurisation des URLs d'avatars affichées sur le site
+ * - Validation des avatars uploadés par les utilisateurs
+ *
+ * 💡 AVANTAGES :
+ * - Réduction drastique des risques de failles XSS ou d'accès non autorisé
+ * - Cohérence et sécurité des données utilisateurs
+ * - Facile à étendre pour de nouveaux formats ou règles
+ *
+ * 🔧 UTILISATION RECOMMANDÉE :
+ * - Pour toute gestion d'avatars utilisateurs (upload, affichage, modification)
+ * - Pour garantir la sécurité des médias utilisateurs
+ */
 class AvatarSecurityService
 {
     private const ALLOWED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp', 'svg'];

@@ -7,6 +7,47 @@ use App\Entity\Screenshot;
 use App\Repository\GameRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
+/**
+ * 📦 SERVICE GAME IMPORTER - IMPORTATION & SYNCHRONISATION DES JEUX
+ *
+ * Ce service gère l'importation, la mise à jour et la synchronisation des jeux vidéo
+ * depuis l'API IGDB vers la base de données locale.
+ *
+ * 🔧 FONCTIONNALITÉS PRINCIPALES :
+ *
+ * 📥 IMPORTS MASSIFS & CIBLÉS :
+ * - Import du Top 100 IGDB (classiques, AAA, populaires)
+ * - Import des meilleurs jeux récents (année en cours)
+ * - Import des jeux populaires (votes, notes)
+ * - Import ciblé par recherche utilisateur
+ *
+ * 🔄 SYNCHRONISATION & MISE À JOUR :
+ * - Mise à jour intelligente des jeux existants (notes, images, genres, etc.)
+ * - Ajout des nouveaux jeux absents de la base
+ * - Gestion des doublons via l'ID IGDB
+ *
+ * 🖼️ GESTION DES MÉDIAS :
+ * - Téléchargement et association des images de couverture et screenshots
+ * - Amélioration automatique de la qualité des images
+ *
+ * 🎯 UTILISATION :
+ * - Utilisé par les commandes d'import, les endpoints d'admin et la recherche intelligente
+ * - Permet d'enrichir la base locale pour accélérer les recherches et améliorer l'expérience utilisateur
+ *
+ * ⚡ EXEMPLES D'USAGE :
+ * - Import hebdomadaire du Top 100 pour la homepage
+ * - Import des nouveautés pour garder la base à jour
+ * - Import à la volée lors d'une recherche utilisateur
+ *
+ * 💡 AVANTAGES :
+ * - Base locale enrichie et cohérente
+ * - Réduction des appels à IGDB en temps réel
+ * - Expérience utilisateur plus fluide et rapide
+ *
+ * 🔧 UTILISATION RECOMMANDÉE :
+ * - Pour toute opération d'import ou de synchronisation de jeux
+ * - Pour garantir la fraîcheur et la qualité des données jeux
+ */
 class GameImporter
 {
     private IgdbClient $igdbClient;
