@@ -76,18 +76,20 @@ class GameController extends AbstractController
 
         // Récupère les paramètres de pagination
         $page = max(1, (int) $request->query->get('page', 1));
-        $limit = 30;
+        $limit = (int) $request->query->get('limit', 20);
         $offset = ($page - 1) * $limit;
 
         // Recherche des jeux via IGDB avec pagination
         $games = $igdb->searchGames($name, $limit, $offset);
+        $totalCount = $igdb->countGames($name);
         
         return $this->json([
             'games' => $games,
             'pagination' => [
                 'currentPage' => $page,
                 'limit' => $limit,
-                'offset' => $offset
+                'offset' => $offset,
+                'totalCount' => $totalCount
             ]
         ]);
     }

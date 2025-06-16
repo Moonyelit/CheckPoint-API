@@ -108,7 +108,7 @@ class IgdbClient
      * @param int $offset L'offset pour la pagination
      * @return array La liste des jeux correspondant à la recherche.
      */
-    public function searchGames(string $search, int $limit = 30, int $offset = 0): array
+    public function searchGames(string $search, int $limit = 20, int $offset = 0): array
     {
         $accessToken = $this->getAccessToken();
 
@@ -354,5 +354,34 @@ class IgdbClient
         }
         
         return $url;
+    }
+
+    /**
+     * Retourne le nombre total de jeux correspondant à une recherche.
+     *
+     * @param string $search Le mot-clé à rechercher.
+     * @return int Le nombre total de jeux trouvés.
+     */
+    public function countGames(string $search): int
+    {
+        try {
+            $accessToken = $this->getAccessToken();
+            $response = $this->client->request('POST', 'https://api.igdb.com/v4/games', [
+                'headers' => [
+                    'Client-ID' => $this->clientId,
+                    'Authorization' => 'Bearer ' . $accessToken,
+                    'Content-Type' => 'text/plain',
+                ],
+                'body' => <<<EOT
+                    fields id;
+                    search "$search";
+                    limit 500;
+                EOT
+            ]);
+            $data = $response->toArray();
+            return count($data);
+        } catch (\Throwable $e) {
+            return 0;
+        }
     }
 }
