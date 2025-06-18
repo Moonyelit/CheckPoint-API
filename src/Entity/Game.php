@@ -124,6 +124,14 @@ class Game
 
     #[ORM\Column(nullable: true)]
     #[Groups(['game:read', 'game:write'])]
+    private ?array $gameModes = null;
+
+    #[ORM\Column(nullable: true)]
+    #[Groups(['game:read', 'game:write'])]
+    private ?array $perspectives = null;
+
+    #[ORM\Column(nullable: true)]
+    #[Groups(['game:read', 'game:write'])]
     private ?float $totalRating = null;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
@@ -261,6 +269,30 @@ class Game
     public function setGenres(?array $genres): static
     {
         $this->genres = $genres;
+
+        return $this;
+    }
+
+    public function getGameModes(): ?array
+    {
+        return $this->gameModes;
+    }
+
+    public function setGameModes(?array $gameModes): static
+    {
+        $this->gameModes = $gameModes;
+
+        return $this;
+    }
+
+    public function getPerspectives(): ?array
+    {
+        return $this->perspectives;
+    }
+
+    public function setPerspectives(?array $perspectives): static
+    {
+        $this->perspectives = $perspectives;
 
         return $this;
     }

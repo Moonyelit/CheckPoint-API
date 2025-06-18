@@ -102,6 +102,16 @@ class GameImporter
                     $existingGame->setGenres($genres);
                 }
 
+                if (isset($apiGame['game_modes'])) {
+                    $gameModes = array_map(fn($mode) => $mode['name'], $apiGame['game_modes']);
+                    $existingGame->setGameModes($gameModes);
+                }
+
+                if (isset($apiGame['player_perspectives'])) {
+                    $perspectives = array_map(fn($perspective) => $perspective['name'], $apiGame['player_perspectives']);
+                    $existingGame->setPerspectives($perspectives);
+                }
+
                 $existingGame->setUpdatedAt(new \DateTimeImmutable());
 
                 // Pas besoin de créer un nouveau jeu, on passe au suivant
@@ -131,6 +141,16 @@ class GameImporter
 
             $platforms = isset($apiGame['platforms']) ? array_map(fn($platform) => $platform['name'], $apiGame['platforms']) : [];
             $game->setPlatforms($platforms);
+
+            if (isset($apiGame['game_modes'])) {
+                $gameModes = array_map(fn($mode) => $mode['name'], $apiGame['game_modes']);
+                $game->setGameModes($gameModes);
+            }
+
+            if (isset($apiGame['player_perspectives'])) {
+                $perspectives = array_map(fn($perspective) => $perspective['name'], $apiGame['player_perspectives']);
+                $game->setPerspectives($perspectives);
+            }
 
             if (isset($apiGame['involved_companies'][0]['company']['name'])) {
                 $game->setDeveloper($apiGame['involved_companies'][0]['company']['name']);
@@ -203,6 +223,16 @@ class GameImporter
                     $existingGame->setGenres($genres);
                 }
 
+                if (isset($apiGame['game_modes'])) {
+                    $gameModes = array_map(fn($mode) => $mode['name'], $apiGame['game_modes']);
+                    $existingGame->setGameModes($gameModes);
+                }
+
+                if (isset($apiGame['player_perspectives'])) {
+                    $perspectives = array_map(fn($perspective) => $perspective['name'], $apiGame['player_perspectives']);
+                    $existingGame->setPerspectives($perspectives);
+                }
+
                 $existingGame->setUpdatedAt(new \DateTimeImmutable());
                 continue;
             }
@@ -235,6 +265,16 @@ class GameImporter
 
             $platforms = isset($apiGame['platforms']) ? array_map(fn($platform) => $platform['name'], $apiGame['platforms']) : [];
             $game->setPlatforms($platforms);
+
+            if (isset($apiGame['game_modes'])) {
+                $gameModes = array_map(fn($mode) => $mode['name'], $apiGame['game_modes']);
+                $game->setGameModes($gameModes);
+            }
+
+            if (isset($apiGame['player_perspectives'])) {
+                $perspectives = array_map(fn($perspective) => $perspective['name'], $apiGame['player_perspectives']);
+                $game->setPerspectives($perspectives);
+            }
 
             if (isset($apiGame['involved_companies'][0]['company']['name'])) {
                 $game->setDeveloper($apiGame['involved_companies'][0]['company']['name']);
@@ -298,6 +338,16 @@ class GameImporter
         $platforms = isset($apiGame['platforms']) ? array_map(fn($platform) => $platform['name'], $apiGame['platforms']) : [];
         $game->setPlatforms($platforms);
 
+        if (isset($apiGame['game_modes'])) {
+            $gameModes = array_map(fn($mode) => $mode['name'], $apiGame['game_modes']);
+            $game->setGameModes($gameModes);
+        }
+
+        if (isset($apiGame['player_perspectives'])) {
+            $perspectives = array_map(fn($perspective) => $perspective['name'], $apiGame['player_perspectives']);
+            $game->setPerspectives($perspectives);
+        }
+
         if (isset($apiGame['involved_companies'][0]['company']['name'])) {
             $game->setDeveloper($apiGame['involved_companies'][0]['company']['name']);
         }
@@ -354,6 +404,16 @@ class GameImporter
 
             $platforms = isset($apiGame['platforms']) ? array_map(fn($platform) => $platform['name'], $apiGame['platforms']) : [];
             $game->setPlatforms($platforms);
+
+            if (isset($apiGame['game_modes'])) {
+                $gameModes = array_map(fn($mode) => $mode['name'], $apiGame['game_modes']);
+                $game->setGameModes($gameModes);
+            }
+
+            if (isset($apiGame['player_perspectives'])) {
+                $perspectives = array_map(fn($perspective) => $perspective['name'], $apiGame['player_perspectives']);
+                $game->setPerspectives($perspectives);
+            }
 
             if (isset($apiGame['involved_companies'][0]['company']['name'])) {
                 $game->setDeveloper($apiGame['involved_companies'][0]['company']['name']);
@@ -448,6 +508,16 @@ class GameImporter
 
                     $platforms = isset($gameData['platforms']) ? array_map(fn($platform) => $platform['name'], $gameData['platforms']) : [];
                     $game->setPlatforms($platforms);
+
+                    if (isset($gameData['game_modes'])) {
+                        $gameModes = array_map(fn($mode) => $mode['name'], $gameData['game_modes']);
+                        $game->setGameModes($gameModes);
+                    }
+
+                    if (isset($gameData['player_perspectives'])) {
+                        $perspectives = array_map(fn($perspective) => $perspective['name'], $gameData['player_perspectives']);
+                        $game->setPerspectives($perspectives);
+                    }
 
                     if (isset($gameData['involved_companies'][0]['company']['name'])) {
                         $game->setDeveloper($gameData['involved_companies'][0]['company']['name']);

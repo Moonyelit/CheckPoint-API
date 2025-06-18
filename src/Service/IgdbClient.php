@@ -120,7 +120,7 @@ class IgdbClient
                 'Content-Type' => 'text/plain',
             ],
             'body' => <<<EOT
-                fields name, summary, cover.url, first_release_date, genres.name, platforms.name, screenshots;
+                fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots;
                 search "$search";
                 limit $limit;
                 offset $offset;
@@ -205,7 +205,7 @@ class IgdbClient
                 'Content-Type' => 'text/plain',
             ],
             'body' => <<<EOT
-            fields name, summary, cover.url, first_release_date, genres.name, platforms.name, screenshots, total_rating, involved_companies.company.name;
+            fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots, total_rating, involved_companies.company.name;
             sort total_rating desc;
             where total_rating != null;
             limit 500;
@@ -251,7 +251,7 @@ class IgdbClient
                 'Content-Type' => 'text/plain',
             ],
             'body' => <<<EOT
-            fields name, summary, cover.url, first_release_date, genres.name, platforms.name, screenshots, total_rating, total_rating_count, involved_companies.company.name;
+            fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots, total_rating, total_rating_count, involved_companies.company.name;
             sort total_rating desc;
             where (first_release_date >= $year2024 & total_rating >= 80 & total_rating_count >= 5) | (first_release_date >= $year2018 & total_rating >= 88 & total_rating_count >= 50) | (total_rating >= 85 & total_rating_count >= 1000);
             limit 100;
@@ -296,7 +296,7 @@ class IgdbClient
                 'Content-Type' => 'text/plain',
             ],
             'body' => <<<EOT
-            fields name, summary, cover.url, first_release_date, genres.name, platforms.name, screenshots, total_rating, total_rating_count, involved_companies.company.name;
+            fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots, total_rating, total_rating_count, involved_companies.company.name;
             sort total_rating desc;
             where first_release_date >= $oneYearAgo & first_release_date <= $now & total_rating >= 75 & total_rating_count >= 10;
             limit 50;
