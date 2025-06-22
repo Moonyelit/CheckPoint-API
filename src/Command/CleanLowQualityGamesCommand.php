@@ -101,7 +101,8 @@ class CleanLowQualityGamesCommand extends Command
         
         $io->text('Suppression en cours...');
         
-        // Supprime d'abord les entités liées (screenshots, wallpapers)
+        // Supprime d'abord les entités liées dans l'ordre correct pour éviter les contraintes de clé étrangère
+        $connection->executeStatement('DELETE FROM user_wallpaper WHERE wallpaper_id IN (SELECT id FROM wallpaper WHERE game_id IN (SELECT id FROM game WHERE total_rating_count < 30 OR total_rating_count IS NULL))');
         $connection->executeStatement('DELETE FROM screenshot WHERE game_id IN (SELECT id FROM game WHERE total_rating_count < 30 OR total_rating_count IS NULL)');
         $connection->executeStatement('DELETE FROM wallpaper WHERE game_id IN (SELECT id FROM game WHERE total_rating_count < 30 OR total_rating_count IS NULL)');
         

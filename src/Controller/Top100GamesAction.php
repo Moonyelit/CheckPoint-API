@@ -48,9 +48,15 @@ final class Top100GamesAction extends AbstractController
     public function __invoke(Request $request): JsonResponse
     {
         $limit = (int) $request->query->get('limit', 5);
+        
+        // Log pour debug
+        error_log("Top100GamesAction appelé avec limit: " . $limit);
 
         // Récupère les jeux du Top 100 avec filtre de qualité (50+ votes)
         $games = $this->repo->findTop100Games($limit);
+        
+        // Log pour debug
+        error_log("Nombre de jeux trouvés: " . count($games));
 
         // Améliore automatiquement la qualité des images pour chaque jeu
         foreach ($games as $game) {
