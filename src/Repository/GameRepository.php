@@ -60,10 +60,7 @@ class GameRepository extends ServiceEntityRepository
     {
         return $this->createQueryBuilder('g')
             ->andWhere('g.totalRating IS NOT NULL')
-            ->andWhere('g.totalRatingCount >= 50') // Filtrage minimum 50 votes
             ->orderBy('g.totalRating', 'DESC')
-            ->addOrderBy('g.totalRatingCount', 'DESC')
-            ->addOrderBy('g.follows', 'DESC')
             ->setMaxResults($limit)
             ->getQuery()
             ->getResult();

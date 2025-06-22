@@ -78,9 +78,6 @@ use ApiPlatform\Metadata\ApiFilter;
             ]
         ),
 
-        // GET /api/games/{id}
-        new Get(),
-
         // Opérations CRUD réservées aux admins
         new Post(security: "is_granted('ROLE_ADMIN')"),
         new Patch(security: "is_granted('ROLE_ADMIN')"),
@@ -105,6 +102,10 @@ class Game
     #[ORM\Column(length: 255)]
     #[Groups(['game:read', 'game:write'])]
     private ?string $title = null;
+
+    #[ORM\Column(length: 255, unique: true, nullable: true)]
+    #[Groups(['game:read', 'game:write'])]
+    private ?string $slug = null;
 
     #[ORM\Column(type: Types::DATE_MUTABLE, nullable: true)]
     #[Groups(['game:read', 'game:write'])]
@@ -221,6 +222,18 @@ class Game
     public function setTitle(string $title): static
     {
         $this->title = $title;
+
+        return $this;
+    }
+
+    public function getSlug(): ?string
+    {
+        return $this->slug;
+    }
+
+    public function setSlug(?string $slug): static
+    {
+        $this->slug = $slug;
 
         return $this;
     }

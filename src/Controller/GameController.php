@@ -11,6 +11,7 @@ use Symfony\Component\RateLimiter\LimiterInterface;
 use Symfony\Component\RateLimiter\RateLimiterFactory;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
+use Psr\Log\LoggerInterface;
 
 use App\Service\GameImporter;
 use App\Repository\GameRepository;
@@ -57,11 +58,14 @@ use Symfony\Component\HttpFoundation\Request;
 class GameController extends AbstractController
 {
     private LimiterInterface $limiter;
+    private LoggerInterface $logger;
 
     public function __construct(
-        #[Autowire(service: 'limiter.apiSearchLimit')] RateLimiterFactory $apiSearchLimitFactory
+        #[Autowire(service: 'limiter.apiSearchLimit')] RateLimiterFactory $apiSearchLimitFactory,
+        LoggerInterface $logger
     ) {
         $this->limiter = $apiSearchLimitFactory->create(); // Crée une instance de LimiterInterface
+        $this->logger = $logger;
     }
 
     #[Route('/api/games/search/{name}', name: 'api_game_search')]
@@ -136,19 +140,23 @@ class GameController extends AbstractController
     #[Route('/api/games/search-or-import/{query}', name: 'api_game_search_or_import')]
     public function searchGame(string $query, GameImporter $gameImporter, GameRepository $gameRepository): JsonResponse
     {
-        // Recherche des jeux dans la base de données
-        $games = $gameRepository->findByTitleLike($query);
+        // 1. On cherche d'abord dans notre base de données.
+        $localGames = $gameRepository->findByTitleLike($query);
 
-        // Si aucun jeu n'est trouvé, tente d'importer depuis IGDB
-        if (count($games) === 0) {
-            $newGame = $gameImporter->importGameBySearch($query);
-            if ($newGame) {
-                $games[] = $newGame;
-            }
+        // 2. Ensuite, on importe les jeux depuis IGDB.
+        // La méthode importGamesBySearch est intelligente : elle met à jour les jeux existants
+        // et ajoute les nouveaux.
+        try {
+            $importedGames = $gameImporter->importGamesBySearch($query);
+        } catch (\Throwable $e) {
+            $this->logger->error("Erreur lors de l'import depuis IGDB: " . $e->getMessage());
+            // Si l'import échoue, on renvoie au moins les résultats locaux.
+            return $this->json($localGames, 200, [], ['groups' => 'game:read']);
         }
 
-        // Retourne les jeux trouvés ou importés
-        return $this->json($games, 200, [], ['groups' => 'game:read']);
+        // 3. On retourne la liste complète des jeux importés/mis à jour.
+        // Le front-end se chargera de la pagination côté client.
+        return $this->json($importedGames, 200, [], ['groups' => 'game:read']);
     }
 
     #[Route('/api/games/improve-image-quality', name: 'api_improve_image_quality', methods: ['POST'])]
@@ -213,6 +221,61 @@ class GameController extends AbstractController
         $gameRepository->getEntityManager()->flush();
 
         return new Response("Mise à jour terminée ! {$updatedCount} images améliorées.");
+    }
+
+    #[Route('/api/games/top100', name: 'api_games_top100')]
+    public function getTop100Games(Request $request, GameRepository $gameRepository, IgdbClient $igdbClient): JsonResponse
+    {
+        $limit = (int) $request->query->get('limit', 5);
+        
+        // Récupère les jeux du Top 100
+        $games = $gameRepository->findTop100Games($limit);
+        
+        // Améliore automatiquement la qualité des images pour chaque jeu
+        foreach ($games as $game) {
+            if ($game->getCoverUrl()) {
+                $improvedUrl = $igdbClient->improveImageQuality($game->getCoverUrl(), 't_cover_big');
+                $game->setCoverUrl($improvedUrl);
+            }
+        }
+
+        return $this->json($games, 200, [], ['groups' => 'game:read']);
+    }
+
+    #[Route('/api/games/{slug}', name: 'api_game_details', priority: -1)]
+    public function getGameBySlug(string $slug, GameRepository $gameRepository): JsonResponse
+    {
+        $this->logger->info("Recherche du jeu avec le slug : '{$slug}'");
+
+        // Test direct en base de données
+        $connection = $gameRepository->getEntityManager()->getConnection();
+        $stmt = $connection->prepare('SELECT COUNT(*) as count FROM game WHERE slug = ?');
+        $result = $stmt->executeQuery([$slug]);
+        $count = $result->fetchAssociative()['count'];
+        
+        $this->logger->info("Nombre de jeux trouvés en base avec le slug '{$slug}' : {$count}");
+
+        $game = $gameRepository->findOneBy(['slug' => $slug]);
+
+        if (!$game) {
+            $this->logger->warning("Jeu non trouvé pour le slug : '{$slug}'");
+            
+            // Log tous les slugs disponibles pour debug
+            $allSlugs = $gameRepository->createQueryBuilder('g')
+                ->select('g.slug, g.title')
+                ->where('g.slug IS NOT NULL')
+                ->andWhere('g.slug != :empty')
+                ->setParameter('empty', '')
+                ->getQuery()
+                ->getResult();
+            
+            $this->logger->info("Slugs disponibles : " . json_encode(array_slice($allSlugs, 0, 10)));
+            
+            return $this->json(['message' => 'Jeu non trouvé'], Response::HTTP_NOT_FOUND);
+        }
+
+        $this->logger->info("Jeu trouvé : '{$game->getTitle()}' pour le slug '{$slug}'");
+        return $this->json($game, Response::HTTP_OK, [], ['groups' => ['game:read', 'game:details']]);
     }
 
 }
