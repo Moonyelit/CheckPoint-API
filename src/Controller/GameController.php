@@ -242,6 +242,25 @@ class GameController extends AbstractController
         return $this->json($games, 200, [], ['groups' => 'game:read']);
     }
 
+    #[Route('/api/games/year/top100', name: 'api_games_top100_year')]
+    public function getTopYearGames(Request $request, GameRepository $gameRepository, IgdbClient $igdbClient): JsonResponse
+    {
+        $limit = (int) $request->query->get('limit', 5);
+        
+        // Récupère les jeux de l'année (365 derniers jours)
+        $games = $gameRepository->findTopYearGames($limit);
+        
+        // Améliore automatiquement la qualité des images pour chaque jeu
+        foreach ($games as $game) {
+            if ($game->getCoverUrl()) {
+                $improvedUrl = $igdbClient->improveImageQuality($game->getCoverUrl(), 't_cover_big');
+                $game->setCoverUrl($improvedUrl);
+            }
+        }
+
+        return $this->json($games, 200, [], ['groups' => 'game:read']);
+    }
+
     #[Route('/api/games/{slug}', name: 'api_game_details', priority: -1)]
     public function getGameBySlug(string $slug, GameRepository $gameRepository): JsonResponse
     {

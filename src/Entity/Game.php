@@ -16,8 +16,6 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use App\Entity\Wallpaper;
 use App\Entity\Screenshot;
-use App\Controller\Top100GamesAction;
-use App\Controller\TopYearGamesAction;
 use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
 use ApiPlatform\Metadata\ApiFilter;
 
@@ -27,56 +25,6 @@ use ApiPlatform\Metadata\ApiFilter;
     operations: [
         // GET /api/games
         new GetCollection(),
-
-        // GET /api/games/top100?limit=5
-        new GetCollection(
-            uriTemplate: '/games/top100',
-            controller: Top100GamesAction::class,
-            read: false,
-            paginationEnabled: false,
-            extraProperties: [
-                'swagger_context' => [
-                    'summary' => 'Retourne les jeux du Top 100 d\'IGDB',
-                    'parameters' => [
-                        [
-                            'name' => 'limit',
-                            'in' => 'query',
-                            'required' => false,
-                            'schema' => ['type' => 'integer', 'default' => 5],
-                            'description' => 'Nombre maximal de jeux à renvoyer',
-                        ],
-                    ],
-                    'responses' => [
-                        '200' => ['description' => 'Liste des jeux du Top 100 IGDB'],
-                    ],
-                ]
-            ]
-        ),
-
-        // GET /api/games/top100-year?limit=5
-        new GetCollection(
-            uriTemplate: '/games/top100-year',
-            controller: TopYearGamesAction::class,
-            read: false,
-            paginationEnabled: false,
-            extraProperties: [
-                'swagger_context' => [
-                    'summary' => 'Retourne les meilleurs jeux de l\'année (365 derniers jours)',
-                    'parameters' => [
-                        [
-                            'name' => 'limit',
-                            'in' => 'query',
-                            'required' => false,
-                            'schema' => ['type' => 'integer', 'default' => 5],
-                            'description' => 'Nombre maximal de jeux à renvoyer',
-                        ],
-                    ],
-                    'responses' => [
-                        '200' => ['description' => 'Liste des meilleurs jeux de l\'année'],
-                    ],
-                ]
-            ]
-        ),
 
         // Opérations CRUD réservées aux admins
         new Post(security: "is_granted('ROLE_ADMIN')"),
