@@ -223,7 +223,7 @@ class GameController extends AbstractController
         return new Response("Mise à jour terminée ! {$updatedCount} images améliorées.");
     }
 
-    #[Route('/api/games/top100', name: 'api_games_top100')]
+    #[Route('/api/custom/games/top100', name: 'api_games_top100')]
     public function getTop100Games(Request $request, GameRepository $gameRepository, IgdbClient $igdbClient): JsonResponse
     {
         $limit = (int) $request->query->get('limit', 5);
@@ -242,7 +242,7 @@ class GameController extends AbstractController
         return $this->json($games, 200, [], ['groups' => 'game:read']);
     }
 
-    #[Route('/api/games/year/top100', name: 'api_games_top100_year')]
+    #[Route('/api/custom/games/year/top100', name: 'api_games_top100_year')]
     public function getTopYearGames(Request $request, GameRepository $gameRepository, IgdbClient $igdbClient): JsonResponse
     {
         $limit = (int) $request->query->get('limit', 5);

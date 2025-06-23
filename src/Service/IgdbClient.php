@@ -253,7 +253,7 @@ class IgdbClient
             'body' => <<<EOT
             fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots, total_rating, total_rating_count, involved_companies.company.name;
             sort total_rating desc;
-            where (first_release_date >= $year2024 & total_rating >= 80 & total_rating_count >= 5) | (first_release_date >= $year2018 & total_rating >= 88 & total_rating_count >= 50) | (total_rating >= 85 & total_rating_count >= 1000);
+            where (first_release_date >= $year2024 & total_rating >= 85 & total_rating_count >= 100) | (first_release_date >= $year2018 & total_rating >= 88 & total_rating_count >= 200) | (total_rating >= 90 & total_rating_count >= 500);
             limit 100;
             EOT
         ]);
