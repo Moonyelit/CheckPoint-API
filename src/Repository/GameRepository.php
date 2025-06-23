@@ -79,8 +79,8 @@ class GameRepository extends ServiceEntityRepository
         return $this->createQueryBuilder('g')
             ->andWhere('g.releaseDate >= :oneYearAgo')
             ->andWhere('g.totalRating IS NOT NULL')
-            ->andWhere('g.totalRating >= 75')
-            ->andWhere('g.totalRatingCount >= 100') // Minimum 100 votes pour garantir la qualité
+            ->andWhere('g.totalRating >= 70')
+            ->andWhere('g.totalRatingCount >= 50')
             ->setParameter('oneYearAgo', $oneYearAgo)
             ->orderBy('g.totalRating', 'DESC')
             ->addOrderBy('g.totalRatingCount', 'DESC')
