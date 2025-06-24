@@ -16,6 +16,7 @@ use Psr\Log\LoggerInterface;
 use App\Service\GameImporter;
 use App\Repository\GameRepository;
 use Symfony\Component\HttpFoundation\Request;
+use App\Service\GameSearchService;
 
 /**
  * 🎮 CONTRÔLEUR PRINCIPAL - GESTION GLOBALE DES JEUX
@@ -62,6 +63,7 @@ class GameController extends AbstractController
 
     public function __construct(
         #[Autowire(service: 'limiter.apiSearchLimit')] RateLimiterFactory $apiSearchLimitFactory,
+        private GameSearchService $gameSearchService,
         LoggerInterface $logger
     ) {
         $this->limiter = $apiSearchLimitFactory->create(); // Crée une instance de LimiterInterface
@@ -140,23 +142,46 @@ class GameController extends AbstractController
     #[Route('/api/games/search-or-import/{query}', name: 'api_game_search_or_import')]
     public function searchGame(string $query, GameImporter $gameImporter, GameRepository $gameRepository): JsonResponse
     {
-        // 1. On cherche d'abord dans notre base de données.
-        $localGames = $gameRepository->findByTitleLike($query);
+        $this->logger->info("Recherche intelligente pour : '{$query}'");
 
-        // 2. Ensuite, on importe les jeux depuis IGDB.
-        // La méthode importGamesBySearch est intelligente : elle met à jour les jeux existants
-        // et ajoute les nouveaux.
+        // 1. On cherche d'abord dans notre base de données (priorité aux jeux locaux)
+        $localGames = $gameRepository->findByTitleLike($query);
+        $this->logger->info(sprintf("Trouvé %d jeux en base locale", count($localGames)));
+
+        // 2. On essaie d'importer depuis IGDB pour enrichir les résultats
+        $importedGames = [];
         try {
             $importedGames = $gameImporter->importGamesBySearch($query);
+            $this->logger->info(sprintf("Importé %d jeux depuis IGDB", count($importedGames)));
         } catch (\Throwable $e) {
             $this->logger->error("Erreur lors de l'import depuis IGDB: " . $e->getMessage());
-            // Si l'import échoue, on renvoie au moins les résultats locaux.
-            return $this->json($localGames, 200, [], ['groups' => 'game:read']);
+            // Si l'import échoue, on renvoie au moins les résultats locaux
+            if (!empty($localGames)) {
+                return $this->json($localGames, 200, [], ['groups' => 'game:read']);
+            }
+            return $this->json(['error' => 'Aucun jeu trouvé localement et erreur lors de l\'import IGDB'], 404);
         }
 
-        // 3. On retourne la liste complète des jeux importés/mis à jour.
-        // Le front-end se chargera de la pagination côté client.
-        return $this->json($importedGames, 200, [], ['groups' => 'game:read']);
+        // 3. Fusion intelligente : priorité aux jeux locaux, puis ajout des nouveaux
+        $finalGames = [];
+        $localGameIds = array_map(fn($game) => $game->getIgdbId(), $localGames);
+        
+        // Ajoute d'abord tous les jeux locaux
+        foreach ($localGames as $localGame) {
+            $finalGames[] = $localGame;
+        }
+        
+        // Ajoute les jeux importés qui ne sont pas déjà en local
+        foreach ($importedGames as $importedGame) {
+            if (!in_array($importedGame->getIgdbId(), $localGameIds)) {
+                $finalGames[] = $importedGame;
+            }
+        }
+
+        $this->logger->info(sprintf("Résultat final : %d jeux (local: %d, importé: %d)", 
+            count($finalGames), count($localGames), count($importedGames) - count($localGames)));
+
+        return $this->json($finalGames, 200, [], ['groups' => 'game:read']);
     }
 
     #[Route('/api/games/improve-image-quality', name: 'api_improve_image_quality', methods: ['POST'])]
@@ -297,4 +322,34 @@ class GameController extends AbstractController
         return $this->json($game, Response::HTTP_OK, [], ['groups' => ['game:read', 'game:details']]);
     }
 
+    #[Route('/api/games/search-with-fallback/{query}', name: 'api_game_search_with_fallback')]
+    public function searchWithFallback(string $query, Request $request): JsonResponse
+    {
+        $forceIgdb = $request->query->get('force_igdb', false);
+        $result = $this->gameSearchService->searchWithFallback($query, $forceIgdb);
+        
+        $statusCode = $result['source'] === 'error' ? 500 : 
+                     ($result['total'] === 0 ? 404 : 200);
+        
+        return $this->json($result, $statusCode, [], ['groups' => 'game:read']);
+    }
+
+    #[Route('/api/games/search-local/{query}', name: 'api_game_search_local')]
+    public function searchLocal(string $query): JsonResponse
+    {
+        $result = $this->gameSearchService->searchLocal($query);
+        
+        $statusCode = $result['total'] === 0 ? 404 : 200;
+        return $this->json($result, $statusCode, [], ['groups' => 'game:read']);
+    }
+
+    #[Route('/api/games/search-igdb/{query}', name: 'api_game_search_igdb')]
+    public function searchIgdb(string $query): JsonResponse
+    {
+        $result = $this->gameSearchService->searchIgdb($query);
+        
+        $statusCode = $result['source'] === 'error' ? 500 : 
+                     ($result['total'] === 0 ? 404 : 200);
+        return $this->json($result, $statusCode, [], ['groups' => 'game:read']);
+    }
 }

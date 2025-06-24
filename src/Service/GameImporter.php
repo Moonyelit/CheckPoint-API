@@ -434,11 +434,11 @@ class GameImporter
                 $game->setDeveloper($apiGame['involved_companies'][0]['company']['name']);
             }
 
-            if (isset($apiGame['screenshots'])) {
-                $screens = $this->igdbClient->getScreenshots($apiGame['screenshots']);
-                foreach ($screens as $s) {
+            if (isset($apiGame['screenshots']) && is_array($apiGame['screenshots'])) {
+                $screenshotData = $this->igdbClient->getScreenshots($apiGame['screenshots']);
+                foreach ($screenshotData as $data) {
                     $screenshot = new Screenshot();
-                    $screenshot->setImage('https:' . $s['url']);
+                    $screenshot->setImage('https:' . $data['url']);
                     $screenshot->setGame($game);
                     $game->addScreenshot($screenshot);
                 }

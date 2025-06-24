@@ -427,4 +427,21 @@ class Game
 
         return $this;
     }
+
+    /**
+     * Récupère le premier screenshot du jeu pour l'utiliser comme image de fond.
+     * 
+     * @return string|null L'URL du premier screenshot ou null si aucun screenshot n'est disponible
+     */
+    #[Groups(['game:read'])]
+    public function getFirstScreenshotUrl(): ?string
+    {
+        $screenshots = $this->getScreenshots();
+        if ($screenshots->isEmpty()) {
+            return null;
+        }
+        
+        $firstScreenshot = $screenshots->first();
+        return $firstScreenshot->getImage();
+    }
 }
