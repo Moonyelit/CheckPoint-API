@@ -434,6 +434,25 @@ class GameImporter
                 $game->setDeveloper($apiGame['involved_companies'][0]['company']['name']);
             }
 
+            // Gestion améliorée de l'image de couverture
+            if (isset($apiGame['cover']['url'])) {
+                $highQualityUrl = $this->igdbClient->improveImageQuality('https:' . $apiGame['cover']['url'], 't_cover_big');
+                $game->setCoverUrl($highQualityUrl);
+            } else {
+                // Si pas de couverture, essayer de récupérer depuis IGDB avec l'ID
+                try {
+                    $detailedGame = $this->igdbClient->getGameDetails($igdbId);
+                    if (isset($detailedGame['cover']['url'])) {
+                        $highQualityUrl = $this->igdbClient->improveImageQuality('https:' . $detailedGame['cover']['url'], 't_cover_big');
+                        $game->setCoverUrl($highQualityUrl);
+                    }
+                } catch (\Exception $e) {
+                    // Log l'erreur mais continue
+                    error_log("Impossible de récupérer les détails du jeu {$igdbId}: " . $e->getMessage());
+                }
+            }
+
+            // Gestion améliorée des screenshots
             if (isset($apiGame['screenshots']) && is_array($apiGame['screenshots'])) {
                 $screenshotData = $this->igdbClient->getScreenshots($apiGame['screenshots']);
                 foreach ($screenshotData as $data) {
@@ -441,6 +460,23 @@ class GameImporter
                     $screenshot->setImage('https:' . $data['url']);
                     $screenshot->setGame($game);
                     $game->addScreenshot($screenshot);
+                }
+            } else {
+                // Si pas de screenshots, essayer de récupérer depuis IGDB avec l'ID
+                try {
+                    $detailedGame = $this->igdbClient->getGameDetails($igdbId);
+                    if (isset($detailedGame['screenshots']) && is_array($detailedGame['screenshots'])) {
+                        $screenshotData = $this->igdbClient->getScreenshots($detailedGame['screenshots']);
+                        foreach ($screenshotData as $data) {
+                            $screenshot = new Screenshot();
+                            $screenshot->setImage('https:' . $data['url']);
+                            $screenshot->setGame($game);
+                            $game->addScreenshot($screenshot);
+                        }
+                    }
+                } catch (\Exception $e) {
+                    // Log l'erreur mais continue
+                    error_log("Impossible de récupérer les screenshots du jeu {$igdbId}: " . $e->getMessage());
                 }
             }
 

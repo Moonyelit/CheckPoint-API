@@ -71,7 +71,7 @@ class GameController extends AbstractController
     }
 
     #[Route('/api/games/search/{name}', name: 'api_game_search')]
-    public function search(string $name, Request $request, IgdbClient $igdb): JsonResponse
+    public function search(string $name, Request $request): JsonResponse
     {
         // Limite les requêtes API.
         $limit = $this->limiter->consume();
@@ -83,21 +83,43 @@ class GameController extends AbstractController
         // Récupère les paramètres de pagination
         $page = max(1, (int) $request->query->get('page', 1));
         $limit = (int) $request->query->get('limit', 20);
-        $offset = ($page - 1) * $limit;
 
-        // Recherche des jeux via IGDB avec pagination
-        $games = $igdb->searchGames($name, $limit, $offset);
-        $totalCount = $igdb->countGames($name);
-        
-        return $this->json([
-            'games' => $games,
-            'pagination' => [
-                'currentPage' => $page,
-                'limit' => $limit,
-                'offset' => $offset,
-                'totalCount' => $totalCount
-            ]
-        ]);
+        try {
+            // Utilise le GameSearchService pour une recherche avec fallback
+            $result = $this->gameSearchService->searchWithFallback($name);
+            
+            // Applique la pagination côté serveur
+            $games = $result['games'];
+            $totalCount = count($games);
+            $offset = ($page - 1) * $limit;
+            $paginatedGames = array_slice($games, $offset, $limit);
+            
+            return $this->json([
+                'games' => $paginatedGames,
+                'pagination' => [
+                    'currentPage' => $page,
+                    'limit' => $limit,
+                    'offset' => $offset,
+                    'totalCount' => $totalCount
+                ],
+                'source' => $result['source'],
+                'message' => $result['message']
+            ]);
+        } catch (\Throwable $e) {
+            $this->logger->error("Erreur lors de la recherche pour '{$name}': " . $e->getMessage());
+            
+            return $this->json([
+                'games' => [],
+                'pagination' => [
+                    'currentPage' => $page,
+                    'limit' => $limit,
+                    'offset' => 0,
+                    'totalCount' => 0
+                ],
+                'error' => 'Erreur lors de la recherche',
+                'message' => 'Impossible de récupérer les résultats'
+            ], 500);
+        }
     }
 
     #[Route('/games/search/{query}', name: 'games_search')]
@@ -287,7 +309,7 @@ class GameController extends AbstractController
     }
 
     #[Route('/api/games/{slug}', name: 'api_game_details', priority: -1)]
-    public function getGameBySlug(string $slug, GameRepository $gameRepository): JsonResponse
+    public function getGameBySlug(string $slug, GameRepository $gameRepository, IgdbClient $igdbClient): JsonResponse
     {
         $this->logger->info("Recherche du jeu avec le slug : '{$slug}'");
 
@@ -318,8 +340,64 @@ class GameController extends AbstractController
             return $this->json(['message' => 'Jeu non trouvé'], Response::HTTP_NOT_FOUND);
         }
 
+        // Améliorer la qualité de l'image de couverture si nécessaire
+        if ($game->getCoverUrl()) {
+            $originalCoverUrl = $game->getCoverUrl();
+            $improvedCoverUrl = $igdbClient->improveImageQuality($originalCoverUrl, 't_cover_big');
+            
+            if ($improvedCoverUrl !== $originalCoverUrl) {
+                $game->setCoverUrl($improvedCoverUrl);
+                $game->setUpdatedAt(new \DateTimeImmutable());
+                
+                // Sauvegarder l'amélioration en base
+                $gameRepository->getEntityManager()->persist($game);
+                $gameRepository->getEntityManager()->flush();
+                
+                $this->logger->info("Image de couverture améliorée pour '{$game->getTitle()}'");
+            }
+        }
+
+        // Récupérer le premier screenshot pour le champ firstScreenshotUrl
+        $screenshots = $game->getScreenshots();
+        $firstScreenshotUrl = null;
+        if ($screenshots->count() > 0) {
+            $firstScreenshot = $screenshots->first();
+            $firstScreenshotUrl = $igdbClient->improveImageQuality($firstScreenshot->getImage(), 't_1080p');
+        }
+
+        // Préparer les données de réponse avec tous les champs nécessaires
+        $gameData = [
+            'id' => $game->getId(),
+            'title' => $game->getTitle(),
+            'slug' => $game->getSlug(),
+            'coverUrl' => $game->getCoverUrl(),
+            'summary' => $game->getSummary(),
+            'totalRating' => $game->getTotalRating(),
+            'platforms' => $game->getPlatforms(),
+            'genres' => $game->getGenres(),
+            'developer' => $game->getDeveloper(),
+            'releaseDate' => $game->getReleaseDate() ? $game->getReleaseDate()->format('Y-m-d') : null,
+            'gameModes' => $game->getGameModes(),
+            'perspectives' => $game->getPerspectives(),
+            'year' => $game->getReleaseDate() ? (int) $game->getReleaseDate()->format('Y') : null,
+            'studio' => $game->getDeveloper(), // Alias pour compatibilité
+            'backgroundUrl' => $game->getCoverUrl(), // Fallback sur la couverture
+            'firstScreenshotUrl' => $firstScreenshotUrl,
+            'synopsis' => $game->getSummary(), // Alias pour compatibilité
+            'playerPerspective' => $game->getPerspectives() ? implode(', ', $game->getPerspectives()) : null,
+            'publisher' => $game->getDeveloper(), // Fallback sur le développeur
+            'igdbId' => $game->getIgdbId(),
+            'series' => null, // À implémenter si nécessaire
+            'titles' => $game->getTitle(), // Alias pour compatibilité
+            'releaseDates' => [], // À implémenter si nécessaire
+            'ageRatings' => null, // À implémenter si nécessaire
+            'stats' => null, // À implémenter si nécessaire
+            'createdAt' => $game->getCreatedAt() ? $game->getCreatedAt()->format('Y-m-d H:i:s') : null,
+            'updatedAt' => $game->getUpdatedAt() ? $game->getUpdatedAt()->format('Y-m-d H:i:s') : null
+        ];
+
         $this->logger->info("Jeu trouvé : '{$game->getTitle()}' pour le slug '{$slug}'");
-        return $this->json($game, Response::HTTP_OK, [], ['groups' => ['game:read', 'game:details']]);
+        return $this->json($gameData, Response::HTTP_OK);
     }
 
     #[Route('/api/games/search-with-fallback/{query}', name: 'api_game_search_with_fallback')]

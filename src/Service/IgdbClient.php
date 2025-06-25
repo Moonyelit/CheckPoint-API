@@ -321,6 +321,54 @@ class IgdbClient
     }
 
     /**
+     * Récupère les détails complets d'un jeu par son ID IGDB.
+     *
+     * Cette méthode récupère toutes les informations détaillées d'un jeu
+     * incluant la couverture, les screenshots, et toutes les métadonnées.
+     *
+     * @param int $gameId L'ID IGDB du jeu
+     * @return array|null Les détails du jeu ou null si non trouvé
+     */
+    public function getGameDetails(int $gameId): ?array
+    {
+        $accessToken = $this->getAccessToken();
+
+        try {
+            // Effectue une requête POST pour récupérer les détails du jeu
+            $response = $this->client->request('POST', 'https://api.igdb.com/v4/games', [
+                'headers' => [
+                    'Client-ID' => $this->clientId,
+                    'Authorization' => 'Bearer ' . $accessToken,
+                    'Content-Type' => 'text/plain',
+                ],
+                'body' => <<<EOT
+                fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots, total_rating, total_rating_count, involved_companies.company.name;
+                where id = $gameId;
+                limit 1;
+                EOT
+            ]);
+
+            $games = $response->toArray();
+            
+            if (empty($games)) {
+                return null;
+            }
+
+            $game = $games[0];
+            
+            // Améliore la qualité de l'image de couverture
+            if (isset($game['cover']['url'])) {
+                $game['cover']['url'] = $this->improveImageQuality($game['cover']['url'], 't_cover_big');
+            }
+
+            return $game;
+        } catch (\Exception $e) {
+            error_log("Erreur lors de la récupération des détails du jeu {$gameId}: " . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
      * Améliore la qualité d'une URL d'image IGDB.
      *
      * @param string $url L'URL originale de l'image
