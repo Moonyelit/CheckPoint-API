@@ -56,11 +56,11 @@ class ImportTopYearGamesCommand extends Command
         $io = new SymfonyStyle($input, $output);
 
         $io->title('🆕 Import des meilleurs jeux de l\'année (365 derniers jours)');
-        $io->info('Critères : Sortis dans les 365 derniers jours, Note ≥75, Votes ≥100');
+        $io->info('Critères : Sortis dans les 365 derniers jours, Note ≥7.5/10 (75/100), Votes ≥80');
         $io->text('🎯 Priorité HeroBanner : Ces jeux s\'affichent en PREMIER sur la page d\'accueil');
 
         try {
-            $importedCount = $this->gameImporter->importTopYearGames();
+            $importedCount = $this->gameImporter->importTopYearGames(80, 75);
             
             $io->success("✅ Import terminé ! {$importedCount} jeux de l'année traités.");
             $io->text('💡 Ces jeux alimentent l\'endpoint /api/games/top100-year');

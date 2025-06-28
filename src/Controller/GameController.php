@@ -146,18 +146,16 @@ class GameController extends AbstractController
     #[Route('/admin/import-top100-games', name: 'admin_import_top100_games')]
     public function importTop100Games(GameImporter $importer): Response
     {
-        // Importe les jeux du Top 100 d'IGDB.
-        $importer->importTop100Games();
-    
+        // Importe les jeux du Top 100 d'IGDB avec critères stricts
+        $importer->importTop100Games(80, 75);
         return new Response('Import du Top 100 IGDB terminé !');
     }
 
     #[Route('/admin/import-top-year-games', name: 'admin_import_top_year_games')]
     public function importTopYearGames(GameImporter $importer): Response
     {
-        // Importe les meilleurs jeux de l'année (365 derniers jours).
-        $count = $importer->importTopYearGames();
-    
+        // Importe les meilleurs jeux de l'année (365 derniers jours) avec critères stricts
+        $count = $importer->importTopYearGames(80, 75);
         return new Response("Import des jeux de l'année terminé ! {$count} jeux traités.");
     }
 

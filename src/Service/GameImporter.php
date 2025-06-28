@@ -183,15 +183,11 @@ class GameImporter
     }
 
     /**
-     * Importe les jeux du Top 100 d'IGDB.
-     * 
-     * Cette méthode récupère les jeux du top 100 avec les meilleures notes
-     * et les sauvegarde en base de données avec leurs statistiques de rating.
+     * Importe les jeux du Top 100 d'IGDB avec critères dynamiques.
      */
-    public function importTop100Games(): void
+    public function importTop100Games(int $minVotes = 80, int $minRating = 75): void
     {
-        // Récupère les jeux du top 100 depuis l'API IGDB
-        $games = $this->igdbClient->getTop100Games();
+        $games = $this->igdbClient->getTop100Games($minVotes, $minRating);
 
         foreach ($games as $apiGame) {
             $igdbId = $apiGame['id'];
@@ -491,11 +487,11 @@ class GameImporter
     }
 
     /**
-     * Importe les meilleurs jeux de l'année (365 derniers jours).
+     * Importe les meilleurs jeux de l'année (365 derniers jours) avec critères dynamiques.
      */
-    public function importTopYearGames(): int
+    public function importTopYearGames(int $minVotes = 80, int $minRating = 75): int
     {
-        $games = $this->igdbClient->getTopYearGames();
+        $games = $this->igdbClient->getTopYearGames($minVotes, $minRating);
         $count = 0;
 
         foreach ($games as $apiGame) {
