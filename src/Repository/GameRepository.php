@@ -189,15 +189,28 @@ class GameRepository extends ServiceEntityRepository
      */
     private function extractMainTitle(string $title): string
     {
+        // Règles spécifiques pour les cas problématiques
+        $specificRules = [
+            'Clair Obscur: Expedition 33 – Deluxe Edition' => 'Clair Obscur: Expedition 33',
+            'Clair Obscur: Expedition 33 - Deluxe Edition' => 'Clair Obscur: Expedition 33',
+            'Astro Bot: Vicious Void' => 'Astro Bot',
+            'Astro Bot: Vicious Void Galaxy' => 'Astro Bot',
+            'Astro Bot: Winter Wonder' => 'Astro Bot',
+            'Astro Bot: Stellar Speedway' => 'Astro Bot',
+            'Split Fiction: Friend\'s Pass' => 'Split Fiction',
+        ];
+
+        // Vérifier d'abord les règles spécifiques
+        if (isset($specificRules[$title])) {
+            return $specificRules[$title];
+        }
+
         // Normaliser les tirets et espaces spéciaux
         $normalized = str_replace([
-            '\x{2013}', // EN DASH
-            '\x{2014}', // EM DASH
-            '\x{00A0}', // espace insécable
             '–', // EN DASH
             '—', // EM DASH
             chr(194).chr(160), // espace insécable utf-8
-        ], ['-', '-', ' ', '-', '-', ' '], $title);
+        ], ['-', '-', ' '], $title);
 
         // Regex pour supprimer les suffixes courants après :, -, ou espace
         $mainTitle = preg_replace(
