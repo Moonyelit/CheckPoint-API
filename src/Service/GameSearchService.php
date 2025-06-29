@@ -45,12 +45,10 @@ class GameSearchService
         // 2. Recherche sur IGDB (toujours effectuée pour enrichir les résultats)
         $igdbGames = [];
         try {
-            $igdbGames = $this->gameImporter->importGamesBySearch($query);
-            $this->logger->info(sprintf("Importé %d jeux depuis IGDB", count($igdbGames)));
+            $igdbGames = $this->gameImporter->getRawGamesBySearch($query);
+            $this->logger->info(sprintf("Trouvé %d jeux IGDB (non persistés)", count($igdbGames)));
         } catch (\Throwable $e) {
-            $this->logger->error("Erreur lors de l'import IGDB: " . $e->getMessage());
-            
-            // Si on a des résultats locaux, on les renvoie malgré l'erreur IGDB
+            $this->logger->error("Erreur lors de la recherche IGDB: " . $e->getMessage());
             if (!empty($localGames)) {
                 return [
                     'games' => $localGames,
@@ -62,7 +60,6 @@ class GameSearchService
                     'error' => $e->getMessage()
                 ];
             }
-            
             return [
                 'games' => [],
                 'source' => 'error',
@@ -74,13 +71,46 @@ class GameSearchService
             ];
         }
 
-        // 3. Fusion intelligente des résultats (toujours effectuée)
-        $finalGames = $this->mergeResults($localGames, $igdbGames);
-        
+        // 3. Fusion intelligente des résultats (priorité aux jeux locaux, puis IGDB non présents)
+        $localIgdbIds = array_map(fn($g) => $g->getIgdbId(), $localGames);
+        $finalGames = [];
+
+        // Ajoute tous les jeux IGDB (enrichis avec un flag isPersisted)
+        foreach ($igdbGames as $apiGame) {
+            $isPersisted = in_array($apiGame['igdbId'], $localIgdbIds);
+            $finalGames[] = array_merge($apiGame, ['isPersisted' => $isPersisted]);
+        }
+
+        // Ajoute les jeux locaux qui n'ont pas d'igdbId (cas rare)
+        foreach ($localGames as $localGame) {
+            if (!$localGame->getIgdbId() || !in_array($localGame->getIgdbId(), array_column($igdbGames, 'igdbId'))) {
+                $finalGames[] = [
+                    'id' => $localGame->getId(),
+                    'title' => $localGame->getTitle(),
+                    'name' => $localGame->getTitle(),
+                    'slug' => $localGame->getSlug(),
+                    'coverUrl' => $localGame->getCoverUrl(),
+                    'cover' => $localGame->getCoverUrl() ? ['url' => $localGame->getCoverUrl()] : null,
+                    'totalRating' => $localGame->getTotalRating(),
+                    'total_rating' => $localGame->getTotalRating(),
+                    'platforms' => $localGame->getPlatforms() ? array_map(fn($platform) => ['name' => $platform], $localGame->getPlatforms()) : [],
+                    'genres' => $localGame->getGenres() ? array_map(fn($genre) => ['name' => $genre], $localGame->getGenres()) : [],
+                    'gameModes' => $localGame->getGameModes() ? array_map(fn($mode) => ['name' => $mode], $localGame->getGameModes()) : [],
+                    'perspectives' => $localGame->getPerspectives() ? array_map(fn($perspective) => ['name' => $perspective], $localGame->getPerspectives()) : [],
+                    'releaseDate' => $localGame->getReleaseDate() ? $localGame->getReleaseDate()->format('Y-m-d') : null,
+                    'first_release_date' => $localGame->getReleaseDate() ? $localGame->getReleaseDate()->getTimestamp() : null,
+                    'summary' => $localGame->getSummary(),
+                    'developer' => $localGame->getDeveloper(),
+                    'igdbId' => $localGame->getIgdbId(),
+                    'isPersisted' => true
+                ];
+            }
+        }
+
         return [
             'games' => $finalGames,
             'source' => empty($localGames) ? 'igdb' : 'mixed',
-            'message' => empty($localGames) ? 'Jeux importés depuis IGDB' : 'Résultats fusionnés (local + IGDB)',
+            'message' => empty($localGames) ? 'Jeux IGDB (non persistés)' : 'Résultats fusionnés (local + IGDB)',
             'total' => count($finalGames),
             'local_count' => count($localGames),
             'igdb_count' => count($igdbGames)

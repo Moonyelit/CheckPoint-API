@@ -10,6 +10,7 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
+use Cocur\Slugify\Slugify;
 
 /**
  * 🏆 COMMANDE D'IMPORT - TOP 100 JEUX DE TOUS LES TEMPS
@@ -27,6 +28,7 @@ use Symfony\Component\Console\Style\SymfonyStyle;
  * 
  * 🧹 NETTOYAGE AUTOMATIQUE :
  * - Suppression des jeux avec <100 votes après import
+ * - Nettoyage automatique des slugs (suppression des IDs IGDB)
  * - Évite les jeux comme "Pixadom" qui polluent le classement
  * 
  * 🎯 OBJECTIF :
@@ -69,6 +71,10 @@ class ImportTop100GamesCommand extends Command
         $this->importer->importTop100Games(80, 75);
 
         $io->success('✅ Import du Top 100 terminé !');
+        
+        // Nettoyage automatique des slugs
+        $io->section('🧹 Nettoyage automatique des slugs');
+        $this->cleanGameSlugs($io);
         
         // Nettoyage automatique des jeux de faible qualité
         $io->section('🧹 Nettoyage automatique des jeux de faible qualité');
@@ -115,7 +121,78 @@ class ImportTop100GamesCommand extends Command
         );
 
         $io->text('💡 Ces jeux alimentent l\'endpoint /api/custom/games/top100');
+        $io->text('🔄 Les slugs sont maintenant propres et uniques !');
 
         return Command::SUCCESS;
+    }
+
+    /**
+     * Nettoie automatiquement les slugs des jeux
+     */
+    private function cleanGameSlugs(SymfonyStyle $io): void
+    {
+        $io->text('🧹 Nettoyage automatique des slugs (suppression des IDs IGDB)...');
+        
+        $games = $this->gameRepository->findAll();
+        $updatedCount = 0;
+        $slugify = new Slugify();
+
+        foreach ($games as $game) {
+            $oldSlug = $game->getSlug();
+            $title = $game->getTitle();
+
+            // Vérifier si le slug contient un ID IGDB (se termine par -nombre)
+            if (preg_match('/^(.+)-\d+$/', $oldSlug, $matches)) {
+                $baseSlug = $matches[1];
+                $newSlug = $this->generateUniqueSlug($baseSlug, $game->getId());
+                
+                if ($newSlug !== $oldSlug) {
+                    $game->setSlug($newSlug);
+                    $this->entityManager->persist($game);
+                    $updatedCount++;
+                    
+                    $io->text(sprintf('✅ %s : %s → %s', $title, $oldSlug, $newSlug));
+                }
+            }
+        }
+
+        if ($updatedCount > 0) {
+            $this->entityManager->flush();
+            $io->success(sprintf('✅ %d slugs nettoyés automatiquement !', $updatedCount));
+        } else {
+            $io->info('Tous les slugs sont déjà propres !');
+        }
+    }
+
+    /**
+     * Génère un slug unique sans inclure l'ID IGDB
+     */
+    private function generateUniqueSlug(string $baseSlug, ?int $existingId = null): string
+    {
+        $slug = $baseSlug;
+        $counter = 1;
+        
+        // Vérifier si le slug existe déjà (sauf pour le jeu actuel)
+        while (true) {
+            $existingGame = $this->gameRepository->findOneBy(['slug' => $slug]);
+            
+            // Si aucun jeu avec ce slug, ou si c'est le même jeu (mise à jour)
+            if (!$existingGame || ($existingId && $existingGame->getId() === $existingId)) {
+                break;
+            }
+            
+            // Sinon, ajouter un suffixe numérique
+            $slug = $baseSlug . '-' . $counter;
+            $counter++;
+            
+            // Éviter les boucles infinies
+            if ($counter > 100) {
+                // Si on a trop de tentatives, ajouter un timestamp pour garantir l'unicité
+                $slug = $baseSlug . '-' . time();
+                break;
+            }
+        }
+        
+        return $slug;
     }
 } 

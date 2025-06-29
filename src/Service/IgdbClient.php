@@ -174,6 +174,53 @@ class IgdbClient
     }
 
     /**
+     * Récupère TOUS les jeux correspondant à une recherche (avec pagination automatique)
+     *
+     * @param string $search Le mot-clé à rechercher.
+     * @param int $maxResults Nombre maximum de résultats à récupérer (défaut: 500)
+     * @return array La liste complète des jeux correspondant à la recherche.
+     */
+    public function searchAllGames(string $search, int $maxResults = 500): array
+    {
+        error_log("🔍 Début searchAllGames IGDB pour: '$search' (max: $maxResults)");
+        
+        $allGames = [];
+        $offset = 0;
+        $limit = 50; // Limite par requête pour éviter les timeouts
+        
+        while (count($allGames) < $maxResults) {
+            try {
+                $games = $this->searchGames($search, $limit, $offset);
+                
+                if (empty($games)) {
+                    error_log("📊 Plus de jeux trouvés pour '$search', arrêt de la pagination");
+                    break; // Plus de résultats disponibles
+                }
+                
+                $allGames = array_merge($allGames, $games);
+                $offset += $limit;
+                
+                error_log("📊 Récupéré " . count($games) . " jeux (total: " . count($allGames) . ")");
+                
+                // Si on a moins de jeux que la limite, c'est qu'on a atteint la fin
+                if (count($games) < $limit) {
+                    break;
+                }
+                
+                // Petite pause pour éviter de surcharger l'API
+                usleep(100000); // 100ms
+                
+            } catch (\Exception $e) {
+                error_log("❌ Erreur lors de la pagination pour '$search': " . $e->getMessage());
+                break;
+            }
+        }
+        
+        error_log("✅ searchAllGames IGDB terminé pour '$search': " . count($allGames) . " jeux au total");
+        return $allGames;
+    }
+
+    /**
      * Récupère les captures d'écran pour une liste d'IDs de jeux.
      *
      * @param array $ids Les IDs des captures d'écran à récupérer.

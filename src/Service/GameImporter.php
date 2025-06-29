@@ -78,86 +78,27 @@ class GameImporter
             // Vérifie si le jeu existe déjà en base
             $existingGame = $this->gameRepository->findOneBy(['igdbId' => $igdbId]);
 
-            if ($existingGame) {
-                // Mise à jour des champs modifiables
-                if (isset($apiGame['name'])) {
-                    $existingGame->setTitle($apiGame['name']);
-                    $baseSlug = $this->slugify->slugify($apiGame['name']);
-                    $uniqueSlug = $baseSlug . '-' . $igdbId;
-                    $existingGame->setSlug($uniqueSlug);
-                }
-                $existingGame->setSummary($apiGame['summary'] ?? $existingGame->getSummary());
-                
-                // Améliore la qualité de l'image si disponible
-                if (isset($apiGame['cover']['url'])) {
-                    $imageUrl = $apiGame['cover']['url'];
-                    if (strpos($imageUrl, '//') === 0) {
-                        $imageUrl = 'https:' . $imageUrl;
-                    }
-                    $highQualityUrl = $this->igdbClient->improveImageQuality($imageUrl, 't_cover_big');
-                    $existingGame->setCoverUrl($highQualityUrl);
-                }
-                
-                if (array_key_exists('total_rating', $apiGame) && $apiGame['total_rating'] !== null) {
-                    $existingGame->setTotalRating($apiGame['total_rating']);
-                }
-
-                if (isset($apiGame['first_release_date'])) {
-                    $existingGame->setReleaseDate((new \DateTime())->setTimestamp($apiGame['first_release_date']));
-                }
-
-                if (isset($apiGame['platforms'])) {
-                    $platforms = array_map(fn($platform) => $platform['name'], $apiGame['platforms']);
-                    $existingGame->setPlatforms($platforms);
-                }
-
-                if (isset($apiGame['genres'])) {
-                    $genres = array_map(fn($genre) => $genre['name'], $apiGame['genres']);
-                    $existingGame->setGenres($genres);
-                }
-
-                if (isset($apiGame['game_modes'])) {
-                    $gameModes = array_map(fn($mode) => $mode['name'], $apiGame['game_modes']);
-                    $existingGame->setGameModes($gameModes);
-                }
-
-                if (isset($apiGame['player_perspectives'])) {
-                    $perspectives = array_map(fn($perspective) => $perspective['name'], $apiGame['player_perspectives']);
-                    $existingGame->setPerspectives($perspectives);
-                }
-
-                $existingGame->setUpdatedAt(new \DateTimeImmutable());
-
-                // Sauvegarde la catégorie (taxonomie du jeu)
-                if (array_key_exists('category', $apiGame)) {
-                    $existingGame->setCategory($apiGame['category']);
-                }
-
-                // Pas besoin de créer un nouveau jeu, on passe au suivant
-                continue;
+            if (!$existingGame) {
+                $game = new Game();
+                $game->setIgdbId($igdbId);
+                $game->setCreatedAt(new \DateTimeImmutable());
+            } else {
+                $game = $existingGame;
             }
 
-            // Sinon, on crée un nouveau jeu
-            $game = new Game();
-            $game->setIgdbId($igdbId);
+            // Met à jour les informations du jeu
             $title = $apiGame['name'] ?? 'Inconnu';
             $game->setTitle($title);
             $baseSlug = $this->slugify->slugify($title);
-            $uniqueSlug = $baseSlug . '-' . $igdbId;
+            // Générer un slug unique sans l'ID IGDB
+            $uniqueSlug = $this->generateUniqueSlug($baseSlug, $game->getId());
             $game->setSlug($uniqueSlug);
-            $game->setSummary($apiGame['summary'] ?? null);
-            
-            // Améliore la qualité de l'image si disponible
-            if (isset($apiGame['cover']['url'])) {
-                $imageUrl = $apiGame['cover']['url'];
-                if (strpos($imageUrl, '//') === 0) {
-                    $imageUrl = 'https:' . $imageUrl;
-                }
-                $highQualityUrl = $this->igdbClient->improveImageQuality($imageUrl, 't_cover_big');
-                $game->setCoverUrl($highQualityUrl);
+
+            if (isset($apiGame['summary'])) {
+                $game->setSummary($apiGame['summary']);
             }
-            
-            if (array_key_exists('total_rating', $apiGame) && $apiGame['total_rating'] !== null) {
+
+            if (array_key_exists('total_rating', $apiGame)) {
                 $game->setTotalRating($apiGame['total_rating']);
             }
 
@@ -165,11 +106,15 @@ class GameImporter
                 $game->setReleaseDate((new \DateTime())->setTimestamp($apiGame['first_release_date']));
             }
 
-            $genres = isset($apiGame['genres']) ? array_map(fn($genre) => $genre['name'], $apiGame['genres']) : [];
-            $game->setGenres($genres);
+            if (isset($apiGame['genres'])) {
+                $genres = array_map(fn($genre) => $genre['name'], $apiGame['genres']);
+                $game->setGenres($genres);
+            }
 
-            $platforms = isset($apiGame['platforms']) ? array_map(fn($platform) => $platform['name'], $apiGame['platforms']) : [];
-            $game->setPlatforms($platforms);
+            if (isset($apiGame['platforms'])) {
+                $platforms = array_map(fn($platform) => $platform['name'], $apiGame['platforms']);
+                $game->setPlatforms($platforms);
+            }
 
             if (isset($apiGame['game_modes'])) {
                 $gameModes = array_map(fn($mode) => $mode['name'], $apiGame['game_modes']);
@@ -185,24 +130,22 @@ class GameImporter
                 $game->setDeveloper($apiGame['involved_companies'][0]['company']['name']);
             }
 
-            if (isset($apiGame['screenshots']) && is_array($apiGame['screenshots'])) {
-                $screenshotData = $this->igdbClient->getScreenshots($apiGame['screenshots']);
-                foreach ($screenshotData as $data) {
-                    $screenshot = new Screenshot();
-                    $imageUrl = $data['url'];
-                    if (strpos($imageUrl, '//') === 0) {
-                        $imageUrl = 'https:' . $imageUrl;
-                    }
-                    $screenshot->setImage($imageUrl);
-                    $screenshot->setGame($game);
-                    $game->addScreenshot($screenshot);
+            if (isset($apiGame['cover']['url'])) {
+                $imageUrl = $apiGame['cover']['url'];
+                if (strpos($imageUrl, '//') === 0) {
+                    $imageUrl = 'https:' . $imageUrl;
                 }
+                $highQualityUrl = $this->igdbClient->improveImageQuality($imageUrl, 't_cover_big');
+                $game->setCoverUrl($highQualityUrl);
             }
 
+            // Ajout des statistiques de rating et popularité
             if (array_key_exists('total_rating_count', $apiGame)) {
                 $game->setTotalRatingCount($apiGame['total_rating_count']);
             }
-            $game->setFollows($apiGame['follows'] ?? null);
+            if (array_key_exists('follows', $apiGame)) {
+                $game->setFollows($apiGame['follows']);
+            }
             $game->setLastPopularityUpdate(new \DateTimeImmutable());
 
             // Sauvegarde la catégorie (taxonomie du jeu)
@@ -210,132 +153,64 @@ class GameImporter
                 $game->setCategory($apiGame['category']);
             }
 
-            $game->setCreatedAt(new \DateTimeImmutable());
+            $game->setUpdatedAt(new \DateTimeImmutable());
+
             $this->entityManager->persist($game);
         }
 
-        // Sauvegarde toutes les modifications
         $this->entityManager->flush();
     }
 
     /**
      * Importe les jeux du Top 100 d'IGDB avec critères dynamiques.
      */
-    public function importTop100Games(int $minVotes = 80, int $minRating = 75): void
+    public function importTop100Games(int $minVotes = 80, int $minRating = 75): int
     {
         $games = $this->igdbClient->getTop100Games($minVotes, $minRating);
+        $count = 0;
 
         foreach ($games as $apiGame) {
             $igdbId = $apiGame['id'];
 
-            // Vérifie si le jeu existe déjà en base
+            // Vérifie si le jeu existe déjà
             $existingGame = $this->gameRepository->findOneBy(['igdbId' => $igdbId]);
-
-            if ($existingGame) {
-                // Mise à jour des champs modifiables
-                if (isset($apiGame['name'])) {
-                    $existingGame->setTitle($apiGame['name']);
-                    $baseSlug = $this->slugify->slugify($apiGame['name']);
-                    $uniqueSlug = $baseSlug . '-' . $igdbId;
-                    $existingGame->setSlug($uniqueSlug);
-                }
-                $existingGame->setSummary($apiGame['summary'] ?? $existingGame->getSummary());
-                
-                // Améliore la qualité de l'image si disponible
-                if (isset($apiGame['cover']['url'])) {
-                    $imageUrl = $apiGame['cover']['url'];
-                    if (strpos($imageUrl, '//') === 0) {
-                        $imageUrl = 'https:' . $imageUrl;
-                    }
-                    $highQualityUrl = $this->igdbClient->improveImageQuality($imageUrl, 't_cover_big');
-                    $existingGame->setCoverUrl($highQualityUrl);
-                }
-                
-                if (array_key_exists('total_rating', $apiGame)) {
-                    $existingGame->setTotalRating($apiGame['total_rating']);
-                }
-
-                // Mise à jour des statistiques de rating
-                if (array_key_exists('total_rating_count', $apiGame)) {
-                    $existingGame->setTotalRatingCount($apiGame['total_rating_count']);
-                }
-                $existingGame->setFollows($apiGame['follows'] ?? $existingGame->getFollows());
-                $existingGame->setLastPopularityUpdate(new \DateTimeImmutable());
-
-                if (isset($apiGame['first_release_date'])) {
-                    $existingGame->setReleaseDate((new \DateTime())->setTimestamp($apiGame['first_release_date']));
-                }
-
-                if (isset($apiGame['platforms'])) {
-                    $platforms = array_map(fn($platform) => $platform['name'], $apiGame['platforms']);
-                    $existingGame->setPlatforms($platforms);
-                }
-
-                if (isset($apiGame['genres'])) {
-                    $genres = array_map(fn($genre) => $genre['name'], $apiGame['genres']);
-                    $existingGame->setGenres($genres);
-                }
-
-                if (isset($apiGame['game_modes'])) {
-                    $gameModes = array_map(fn($mode) => $mode['name'], $apiGame['game_modes']);
-                    $existingGame->setGameModes($gameModes);
-                }
-
-                if (isset($apiGame['player_perspectives'])) {
-                    $perspectives = array_map(fn($perspective) => $perspective['name'], $apiGame['player_perspectives']);
-                    $existingGame->setPerspectives($perspectives);
-                }
-
-                $existingGame->setUpdatedAt(new \DateTimeImmutable());
-
-                // Sauvegarde la catégorie (taxonomie du jeu)
-                if (array_key_exists('category', $apiGame)) {
-                    $existingGame->setCategory($apiGame['category']);
-                }
-
-                continue;
+            if (!$existingGame) {
+                $game = new Game();
+                $game->setIgdbId($igdbId);
+                $game->setCreatedAt(new \DateTimeImmutable());
+            } else {
+                $game = $existingGame;
             }
 
-            // Sinon, on crée un nouveau jeu
-            $game = new Game();
-            $game->setIgdbId($igdbId);
+            // Met à jour les informations du jeu
             $title = $apiGame['name'] ?? 'Inconnu';
             $game->setTitle($title);
             $baseSlug = $this->slugify->slugify($title);
-            $uniqueSlug = $baseSlug . '-' . $igdbId;
+            // Générer un slug unique sans l'ID IGDB
+            $uniqueSlug = $this->generateUniqueSlug($baseSlug, $game->getId());
             $game->setSlug($uniqueSlug);
-            $game->setSummary($apiGame['summary'] ?? null);
-            
-            // Améliore la qualité de l'image si disponible
-            if (isset($apiGame['cover']['url'])) {
-                $imageUrl = $apiGame['cover']['url'];
-                if (strpos($imageUrl, '//') === 0) {
-                    $imageUrl = 'https:' . $imageUrl;
-                }
-                $highQualityUrl = $this->igdbClient->improveImageQuality($imageUrl, 't_cover_big');
-                $game->setCoverUrl($highQualityUrl);
-            }
-            
-            if (array_key_exists('total_rating', $apiGame) && $apiGame['total_rating'] !== null) {
-                $game->setTotalRating($apiGame['total_rating']);
+
+            if (isset($apiGame['summary'])) {
+                $game->setSummary($apiGame['summary']);
             }
 
-            // Ajout des statistiques de rating du top 100
-            if (array_key_exists('total_rating_count', $apiGame)) {
-                $game->setTotalRatingCount($apiGame['total_rating_count']);
+            if (array_key_exists('total_rating', $apiGame)) {
+                $game->setTotalRating($apiGame['total_rating']);
             }
-            $game->setFollows($apiGame['follows'] ?? null);
-            $game->setLastPopularityUpdate(new \DateTimeImmutable());
 
             if (isset($apiGame['first_release_date'])) {
                 $game->setReleaseDate((new \DateTime())->setTimestamp($apiGame['first_release_date']));
             }
 
-            $genres = isset($apiGame['genres']) ? array_map(fn($genre) => $genre['name'], $apiGame['genres']) : [];
-            $game->setGenres($genres);
+            if (isset($apiGame['genres'])) {
+                $genres = array_map(fn($genre) => $genre['name'], $apiGame['genres']);
+                $game->setGenres($genres);
+            }
 
-            $platforms = isset($apiGame['platforms']) ? array_map(fn($platform) => $platform['name'], $apiGame['platforms']) : [];
-            $game->setPlatforms($platforms);
+            if (isset($apiGame['platforms'])) {
+                $platforms = array_map(fn($platform) => $platform['name'], $apiGame['platforms']);
+                $game->setPlatforms($platforms);
+            }
 
             if (isset($apiGame['game_modes'])) {
                 $gameModes = array_map(fn($mode) => $mode['name'], $apiGame['game_modes']);
@@ -351,31 +226,37 @@ class GameImporter
                 $game->setDeveloper($apiGame['involved_companies'][0]['company']['name']);
             }
 
-            if (isset($apiGame['screenshots']) && is_array($apiGame['screenshots'])) {
-                $screenshotData = $this->igdbClient->getScreenshots($apiGame['screenshots']);
-                foreach ($screenshotData as $data) {
-                    $screenshot = new Screenshot();
-                    $imageUrl = $data['url'];
-                    if (strpos($imageUrl, '//') === 0) {
-                        $imageUrl = 'https:' . $imageUrl;
-                    }
-                    $screenshot->setImage($imageUrl);
-                    $screenshot->setGame($game);
-                    $game->addScreenshot($screenshot);
+            if (isset($apiGame['cover']['url'])) {
+                $imageUrl = $apiGame['cover']['url'];
+                if (strpos($imageUrl, '//') === 0) {
+                    $imageUrl = 'https:' . $imageUrl;
                 }
+                $highQualityUrl = $this->igdbClient->improveImageQuality($imageUrl, 't_cover_big');
+                $game->setCoverUrl($highQualityUrl);
             }
+
+            // Ajout des statistiques de rating et popularité
+            if (array_key_exists('total_rating_count', $apiGame)) {
+                $game->setTotalRatingCount($apiGame['total_rating_count']);
+            }
+            if (array_key_exists('follows', $apiGame)) {
+                $game->setFollows($apiGame['follows']);
+            }
+            $game->setLastPopularityUpdate(new \DateTimeImmutable());
 
             // Sauvegarde la catégorie (taxonomie du jeu)
             if (array_key_exists('category', $apiGame)) {
                 $game->setCategory($apiGame['category']);
             }
 
-            $game->setCreatedAt(new \DateTimeImmutable());
+            $game->setUpdatedAt(new \DateTimeImmutable());
+
             $this->entityManager->persist($game);
+            $count++;
         }
 
-        // Sauvegarde toutes les modifications
         $this->entityManager->flush();
+        return $count;
     }
 
     public function importGameBySearch(string $search): ?Game
@@ -401,19 +282,14 @@ class GameImporter
         $title = $apiGame['name'] ?? 'Inconnu';
         $game->setTitle($title);
         $baseSlug = $this->slugify->slugify($title);
-        $uniqueSlug = $baseSlug . '-' . $igdbId;
+        // Générer un slug unique sans l'ID IGDB
+        $uniqueSlug = $this->generateUniqueSlug($baseSlug, $game->getId());
         $game->setSlug($uniqueSlug);
 
-        if (isset($apiGame['cover']['url'])) {
-            $imageUrl = $apiGame['cover']['url'];
-            if (strpos($imageUrl, '//') === 0) {
-                $imageUrl = 'https:' . $imageUrl;
-            }
-            $highQualityUrl = $this->igdbClient->improveImageQuality($imageUrl, 't_cover_big');
-            $game->setCoverUrl($highQualityUrl);
+        if (isset($apiGame['summary'])) {
+            $game->setSummary($apiGame['summary']);
         }
         
-        $game->setSummary($apiGame['summary'] ?? null);
         if (array_key_exists('total_rating', $apiGame)) {
             $game->setTotalRating($apiGame['total_rating']);
         }
@@ -436,11 +312,15 @@ class GameImporter
             $game->setReleaseDate((new \DateTime())->setTimestamp($apiGame['first_release_date']));
         }
 
-        $genres = isset($apiGame['genres']) ? array_map(fn($genre) => $genre['name'], $apiGame['genres']) : [];
-        $game->setGenres($genres);
+        if (isset($apiGame['genres'])) {
+            $genres = array_map(fn($genre) => $genre['name'], $apiGame['genres']);
+            $game->setGenres($genres);
+        }
 
-        $platforms = isset($apiGame['platforms']) ? array_map(fn($platform) => $platform['name'], $apiGame['platforms']) : [];
-        $game->setPlatforms($platforms);
+        if (isset($apiGame['platforms'])) {
+            $platforms = array_map(fn($platform) => $platform['name'], $apiGame['platforms']);
+            $game->setPlatforms($platforms);
+        }
 
         if (isset($apiGame['game_modes'])) {
             $gameModes = array_map(fn($mode) => $mode['name'], $apiGame['game_modes']);
@@ -454,6 +334,15 @@ class GameImporter
 
         if (isset($apiGame['involved_companies'][0]['company']['name'])) {
             $game->setDeveloper($apiGame['involved_companies'][0]['company']['name']);
+        }
+
+        if (isset($apiGame['cover']['url'])) {
+            $imageUrl = $apiGame['cover']['url'];
+            if (strpos($imageUrl, '//') === 0) {
+                $imageUrl = 'https:' . $imageUrl;
+            }
+            $highQualityUrl = $this->igdbClient->improveImageQuality($imageUrl, 't_cover_big');
+            $game->setCoverUrl($highQualityUrl);
         }
 
         if (isset($apiGame['screenshots']) && is_array($apiGame['screenshots'])) {
@@ -480,13 +369,13 @@ class GameImporter
 
     public function importGamesBySearch(string $query): array
     {
-        // Recherche des jeux via IGDB
-        try {
-            $apiGames = $this->igdbClient->searchGames($query);
-        } catch (\Exception $e) {
-            throw $e;
+        // Récupère TOUS les jeux correspondant à la recherche (pas de limite)
+        $apiGames = $this->igdbClient->searchAllGames($query, 500); // Limite à 500 pour éviter les timeouts
+
+        if (empty($apiGames)) {
+            return []; // Aucun jeu trouvé
         }
-        
+
         $importedGames = [];
 
         foreach ($apiGames as $index => $apiGame) {
@@ -506,10 +395,14 @@ class GameImporter
             // Met à jour les informations du jeu
             $game->setTitle($title);
             $baseSlug = $this->slugify->slugify($title);
-            $uniqueSlug = $baseSlug . '-' . $igdbId;
+            // Générer un slug unique sans l'ID IGDB
+            $uniqueSlug = $this->generateUniqueSlug($baseSlug, $game->getId());
             $game->setSlug($uniqueSlug);
             
-            $game->setSummary($apiGame['summary'] ?? null);
+            if (isset($apiGame['summary'])) {
+                $game->setSummary($apiGame['summary']);
+            }
+            
             if (array_key_exists('total_rating', $apiGame)) {
                 $game->setTotalRating($apiGame['total_rating']);
             }
@@ -518,11 +411,15 @@ class GameImporter
                 $game->setReleaseDate((new \DateTime())->setTimestamp($apiGame['first_release_date']));
             }
 
-            $genres = isset($apiGame['genres']) ? array_map(fn($genre) => $genre['name'], $apiGame['genres']) : [];
-            $game->setGenres($genres);
+            if (isset($apiGame['genres'])) {
+                $genres = array_map(fn($genre) => $genre['name'], $apiGame['genres']);
+                $game->setGenres($genres);
+            }
 
-            $platforms = isset($apiGame['platforms']) ? array_map(fn($platform) => $platform['name'], $apiGame['platforms']) : [];
-            $game->setPlatforms($platforms);
+            if (isset($apiGame['platforms'])) {
+                $platforms = array_map(fn($platform) => $platform['name'], $apiGame['platforms']);
+                $game->setPlatforms($platforms);
+            }
 
             if (isset($apiGame['game_modes'])) {
                 $gameModes = array_map(fn($mode) => $mode['name'], $apiGame['game_modes']);
@@ -538,7 +435,6 @@ class GameImporter
                 $game->setDeveloper($apiGame['involved_companies'][0]['company']['name']);
             }
 
-            // Gestion améliorée de l'image de couverture
             if (isset($apiGame['cover']['url'])) {
                 $imageUrl = $apiGame['cover']['url'];
                 if (strpos($imageUrl, '//') === 0) {
@@ -546,24 +442,8 @@ class GameImporter
                 }
                 $highQualityUrl = $this->igdbClient->improveImageQuality($imageUrl, 't_cover_big');
                 $game->setCoverUrl($highQualityUrl);
-            } else {
-                // Si pas de couverture, essayer de récupérer depuis IGDB avec l'ID
-                try {
-                    $detailedGame = $this->igdbClient->getGameDetails($igdbId);
-                    if (isset($detailedGame['cover']['url'])) {
-                        $imageUrl = $detailedGame['cover']['url'];
-                        if (strpos($imageUrl, '//') === 0) {
-                            $imageUrl = 'https:' . $imageUrl;
-                        }
-                        $highQualityUrl = $this->igdbClient->improveImageQuality($imageUrl, 't_cover_big');
-                        $game->setCoverUrl($highQualityUrl);
-                    }
-                } catch (\Exception $e) {
-                    // Log l'erreur mais continue
-                }
             }
 
-            // Gestion améliorée des screenshots
             if (isset($apiGame['screenshots']) && is_array($apiGame['screenshots'])) {
                 $screenshotData = $this->igdbClient->getScreenshots($apiGame['screenshots']);
                 foreach ($screenshotData as $data) {
@@ -576,32 +456,15 @@ class GameImporter
                     $screenshot->setGame($game);
                     $game->addScreenshot($screenshot);
                 }
-            } else {
-                // Si pas de screenshots, essayer de récupérer depuis IGDB avec l'ID
-                try {
-                    $detailedGame = $this->igdbClient->getGameDetails($igdbId);
-                    if (isset($detailedGame['screenshots']) && is_array($detailedGame['screenshots'])) {
-                        $screenshotData = $this->igdbClient->getScreenshots($detailedGame['screenshots']);
-                        foreach ($screenshotData as $data) {
-                            $screenshot = new Screenshot();
-                            $imageUrl = $data['url'];
-                            if (strpos($imageUrl, '//') === 0) {
-                                $imageUrl = 'https:' . $imageUrl;
-                            }
-                            $screenshot->setImage($imageUrl);
-                            $screenshot->setGame($game);
-                            $game->addScreenshot($screenshot);
-                        }
-                    }
-                } catch (\Exception $e) {
-                    // Log l'erreur mais continue
-                }
             }
 
+            // Ajout des statistiques de rating et popularité
             if (array_key_exists('total_rating_count', $apiGame)) {
                 $game->setTotalRatingCount($apiGame['total_rating_count']);
             }
-            $game->setFollows($apiGame['follows'] ?? null);
+            if (array_key_exists('follows', $apiGame)) {
+                $game->setFollows($apiGame['follows']);
+            }
             $game->setLastPopularityUpdate(new \DateTimeImmutable());
 
             // Sauvegarde la catégorie (taxonomie du jeu)
@@ -633,60 +496,47 @@ class GameImporter
         $count = 0;
 
         foreach ($games as $apiGame) {
-            $count++;
             $igdbId = $apiGame['id'];
-            $title = $apiGame['name'] ?? 'Titre inconnu';
-            $slug = $this->slugify->slugify($title);
 
-            // Vérifie si le jeu existe déjà par igdbId OU par slug
-            $game = $this->gameRepository->findOneBy(['igdbId' => $igdbId]);
-            if (!$game) {
-                $game = $this->gameRepository->findOneBy(['slug' => $slug]);
-            }
-
-            if (!$game) {
+            // Vérifie si le jeu existe déjà
+            $existingGame = $this->gameRepository->findOneBy(['igdbId' => $igdbId]);
+            if (!$existingGame) {
                 $game = new Game();
                 $game->setIgdbId($igdbId);
+                $game->setCreatedAt(new \DateTimeImmutable());
+            } else {
+                $game = $existingGame;
             }
 
+            // Met à jour les informations du jeu
+            $title = $apiGame['name'] ?? 'Inconnu';
             $game->setTitle($title);
-            $game->setSlug($slug);
+            $baseSlug = $this->slugify->slugify($title);
+            // Générer un slug unique sans l'ID IGDB
+            $uniqueSlug = $this->generateUniqueSlug($baseSlug, $game->getId());
+            $game->setSlug($uniqueSlug);
 
-            if (isset($apiGame['cover']['url'])) {
-                $imageUrl = $apiGame['cover']['url'];
-                if (strpos($imageUrl, '//') === 0) {
-                    $imageUrl = 'https:' . $imageUrl;
-                }
-                $highQualityUrl = $this->igdbClient->improveImageQuality($imageUrl, 't_cover_big');
-                $game->setCoverUrl($highQualityUrl);
+            if (isset($apiGame['summary'])) {
+                $game->setSummary($apiGame['summary']);
             }
 
-            $game->setSummary($apiGame['summary'] ?? null);
             if (array_key_exists('total_rating', $apiGame)) {
                 $game->setTotalRating($apiGame['total_rating']);
-            }
-            if (array_key_exists('total_rating_count', $apiGame)) {
-                $game->setTotalRatingCount($apiGame['total_rating_count']);
-            }
-            if (array_key_exists('follows', $apiGame)) {
-                $game->setFollows($apiGame['follows']);
-            }
-            $game->setLastPopularityUpdate(new \DateTimeImmutable());
-
-            // Sauvegarde la catégorie (taxonomie du jeu)
-            if (array_key_exists('category', $apiGame)) {
-                $game->setCategory($apiGame['category']);
             }
 
             if (isset($apiGame['first_release_date'])) {
                 $game->setReleaseDate((new \DateTime())->setTimestamp($apiGame['first_release_date']));
             }
 
-            $genres = isset($apiGame['genres']) ? array_map(fn($genre) => $genre['name'], $apiGame['genres']) : [];
-            $game->setGenres($genres);
+            if (isset($apiGame['genres'])) {
+                $genres = array_map(fn($genre) => $genre['name'], $apiGame['genres']);
+                $game->setGenres($genres);
+            }
 
-            $platforms = isset($apiGame['platforms']) ? array_map(fn($platform) => $platform['name'], $apiGame['platforms']) : [];
-            $game->setPlatforms($platforms);
+            if (isset($apiGame['platforms'])) {
+                $platforms = array_map(fn($platform) => $platform['name'], $apiGame['platforms']);
+                $game->setPlatforms($platforms);
+            }
 
             if (isset($apiGame['game_modes'])) {
                 $gameModes = array_map(fn($mode) => $mode['name'], $apiGame['game_modes']);
@@ -702,25 +552,96 @@ class GameImporter
                 $game->setDeveloper($apiGame['involved_companies'][0]['company']['name']);
             }
 
-            if (isset($apiGame['screenshots']) && is_array($apiGame['screenshots'])) {
-                $screenshotData = $this->igdbClient->getScreenshots($apiGame['screenshots']);
-                foreach ($screenshotData as $data) {
-                    $screenshot = new Screenshot();
-                    $imageUrl = $data['url'];
-                    if (strpos($imageUrl, '//') === 0) {
-                        $imageUrl = 'https:' . $imageUrl;
-                    }
-                    $screenshot->setImage($imageUrl);
-                    $screenshot->setGame($game);
-                    $game->addScreenshot($screenshot);
+            if (isset($apiGame['cover']['url'])) {
+                $imageUrl = $apiGame['cover']['url'];
+                if (strpos($imageUrl, '//') === 0) {
+                    $imageUrl = 'https:' . $imageUrl;
                 }
+                $highQualityUrl = $this->igdbClient->improveImageQuality($imageUrl, 't_cover_big');
+                $game->setCoverUrl($highQualityUrl);
+            }
+
+            // Ajout des statistiques de rating et popularité
+            if (array_key_exists('total_rating_count', $apiGame)) {
+                $game->setTotalRatingCount($apiGame['total_rating_count']);
+            }
+            if (array_key_exists('follows', $apiGame)) {
+                $game->setFollows($apiGame['follows']);
+            }
+            $game->setLastPopularityUpdate(new \DateTimeImmutable());
+
+            // Sauvegarde la catégorie (taxonomie du jeu)
+            if (array_key_exists('category', $apiGame)) {
+                $game->setCategory($apiGame['category']);
             }
 
             $game->setUpdatedAt(new \DateTimeImmutable());
+
             $this->entityManager->persist($game);
+            $count++;
         }
 
         $this->entityManager->flush();
         return $count;
+    }
+
+    /**
+     * Génère un slug unique sans inclure l'ID IGDB
+     * 
+     * @param string $baseSlug Le slug de base généré à partir du titre
+     * @param int|null $existingId L'ID du jeu existant (null si nouveau)
+     * @return string Le slug unique
+     */
+    private function generateUniqueSlug(string $baseSlug, ?int $existingId = null): string
+    {
+        $slug = $baseSlug;
+        $counter = 1;
+        
+        // Vérifier si le slug existe déjà (sauf pour le jeu actuel)
+        while (true) {
+            $existingGame = $this->gameRepository->findOneBy(['slug' => $slug]);
+            
+            // Si aucun jeu avec ce slug, ou si c'est le même jeu (mise à jour)
+            if (!$existingGame || ($existingId && $existingGame->getId() === $existingId)) {
+                break;
+            }
+            
+            // Sinon, ajouter un suffixe numérique
+            $slug = $baseSlug . '-' . $counter;
+            $counter++;
+        }
+        
+        return $slug;
+    }
+
+    /**
+     * Retourne les jeux IGDB trouvés pour une recherche, sans les persister
+     */
+    public function getRawGamesBySearch(string $query): array
+    {
+        $apiGames = $this->igdbClient->searchAllGames($query, 500);
+        $result = [];
+        foreach ($apiGames as $apiGame) {
+            $result[] = [
+                'id' => null,
+                'title' => $apiGame['name'] ?? 'Inconnu',
+                'name' => $apiGame['name'] ?? 'Inconnu',
+                'slug' => $this->slugify->slugify($apiGame['name'] ?? 'inconnu'),
+                'coverUrl' => isset($apiGame['cover']['url']) ? $apiGame['cover']['url'] : null,
+                'cover' => isset($apiGame['cover']['url']) ? ['url' => $apiGame['cover']['url']] : null,
+                'totalRating' => $apiGame['total_rating'] ?? null,
+                'total_rating' => $apiGame['total_rating'] ?? null,
+                'platforms' => isset($apiGame['platforms']) ? array_map(fn($p) => ['name' => is_array($p) && isset($p['name']) ? $p['name'] : $p], $apiGame['platforms']) : [],
+                'genres' => isset($apiGame['genres']) ? array_map(fn($g) => ['name' => is_array($g) && isset($g['name']) ? $g['name'] : $g], $apiGame['genres']) : [],
+                'gameModes' => isset($apiGame['game_modes']) ? array_map(fn($m) => ['name' => is_array($m) && isset($m['name']) ? $m['name'] : $m], $apiGame['game_modes']) : [],
+                'perspectives' => isset($apiGame['player_perspectives']) ? array_map(fn($p) => ['name' => is_array($p) && isset($p['name']) ? $p['name'] : $p], $apiGame['player_perspectives']) : [],
+                'releaseDate' => isset($apiGame['first_release_date']) ? (new \DateTime())->setTimestamp($apiGame['first_release_date'])->format('Y-m-d') : null,
+                'first_release_date' => $apiGame['first_release_date'] ?? null,
+                'summary' => $apiGame['summary'] ?? null,
+                'developer' => isset($apiGame['involved_companies'][0]['company']['name']) ? $apiGame['involved_companies'][0]['company']['name'] : null,
+                'igdbId' => $apiGame['id'] ?? null
+            ];
+        }
+        return $result;
     }
 }

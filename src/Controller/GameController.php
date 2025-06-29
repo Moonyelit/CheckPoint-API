@@ -90,8 +90,13 @@ class GameController extends AbstractController
             // Utilise le GameSearchService pour une recherche avec fallback
             $result = $this->gameSearchService->searchWithFallback($name);
             
-            // Sérialise manuellement les entités Game
+            // Sérialise manuellement les entités Game ou les tableaux IGDB
             $games = array_map(function($game) {
+                // Si c'est un tableau IGDB (non persisté)
+                if (is_array($game)) {
+                    return $game;
+                }
+                // Sinon, entité persistée
                 return [
                     'id' => $game->getId(),
                     'title' => $game->getTitle(),
@@ -117,7 +122,8 @@ class GameController extends AbstractController
                     'first_release_date' => $game->getReleaseDate() ? $game->getReleaseDate()->getTimestamp() : null,
                     'summary' => $game->getSummary(),
                     'developer' => $game->getDeveloper(),
-                    'igdbId' => $game->getIgdbId()
+                    'igdbId' => $game->getIgdbId(),
+                    'isPersisted' => true
                 ];
             }, $result['games']);
             
@@ -126,13 +132,17 @@ class GameController extends AbstractController
             $offset = ($page - 1) * $limit;
             $paginatedGames = array_slice($games, $offset, $limit);
             
+            $this->logger->info(sprintf("Recherche '%s': %d jeux au total, page %d/%d (%d jeux affichés)", 
+                $name, $totalCount, $page, ceil($totalCount / $limit), count($paginatedGames)));
+            
             return $this->json([
                 'games' => $paginatedGames,
                 'pagination' => [
                     'currentPage' => $page,
                     'limit' => $limit,
                     'offset' => $offset,
-                    'totalCount' => $totalCount
+                    'totalCount' => $totalCount,
+                    'totalPages' => ceil($totalCount / $limit)
                 ],
                 'source' => $result['source'],
                 'message' => $result['message']
@@ -146,7 +156,8 @@ class GameController extends AbstractController
                     'currentPage' => $page,
                     'limit' => $limit,
                     'offset' => 0,
-                    'totalCount' => 0
+                    'totalCount' => 0,
+                    'totalPages' => 0
                 ],
                 'error' => 'Erreur lors de la recherche',
                 'message' => 'Impossible de récupérer les résultats'
@@ -355,23 +366,51 @@ class GameController extends AbstractController
         return $this->json($games, 200, [], ['groups' => 'game:read']);
     }
 
-    #[Route('/api/games/{slug}', name: 'api_game_details', priority: -1)]
-    public function getGameBySlug(string $slug, GameRepository $gameRepository, IgdbClient $igdbClient): JsonResponse
+    #[Route('/api/custom/games/{slug}', name: 'api_game_details', priority: -1)]
+    public function getGameBySlug(string $slug, GameRepository $gameRepository, IgdbClient $igdbClient, GameImporter $gameImporter): JsonResponse
     {
         $this->logger->info("Recherche du jeu avec le slug : '{$slug}'");
 
-        // Test direct en base de données
-        $connection = $gameRepository->getEntityManager()->getConnection();
-        $stmt = $connection->prepare('SELECT COUNT(*) as count FROM game WHERE slug = ?');
-        $result = $stmt->executeQuery([$slug]);
-        $count = $result->fetchAssociative()['count'];
-        
-        $this->logger->info("Nombre de jeux trouvés en base avec le slug '{$slug}' : {$count}");
-
         $game = $gameRepository->findOneBy(['slug' => $slug]);
 
+        // Fallback : si le jeu n'est pas trouvé, chercher un slug qui commence pareil (ex: final-fantasy-vi-426)
         if (!$game) {
-            $this->logger->warning("Jeu non trouvé pour le slug : '{$slug}'");
+            $this->logger->info("Slug exact non trouvé, tentative de fallback sur les slugs similaires");
+            $qb = $gameRepository->createQueryBuilder('g');
+            $qb->where('g.slug LIKE :slugStart')
+                ->setParameter('slugStart', $slug . '%');
+            $similarGames = $qb->getQuery()->getResult();
+            if (!empty($similarGames)) {
+                $game = $similarGames[0];
+                $this->logger->info("Jeu trouvé par fallback : '{$game->getTitle()}' avec le slug '{$game->getSlug()}'");
+            }
+        }
+
+        // Si le jeu n'est toujours pas trouvé, tenter l'import depuis IGDB
+        if (!$game) {
+            $this->logger->info("Jeu non trouvé en base, tentative d'import depuis IGDB pour le slug : '{$slug}'");
+            
+            try {
+                // Extraire le titre du slug pour la recherche IGDB
+                $title = $this->extractTitleFromSlug($slug);
+                $this->logger->info("Recherche IGDB avec le titre : '{$title}'");
+                
+                // Tenter d'importer le jeu depuis IGDB avec plusieurs variantes
+                $importedGame = $this->tryImportWithVariants($title, $gameImporter);
+                
+                if ($importedGame) {
+                    $game = $importedGame;
+                    $this->logger->info("✅ Jeu importé avec succès depuis IGDB : '{$game->getTitle()}'");
+                } else {
+                    $this->logger->warning("❌ Aucun jeu trouvé sur IGDB pour le titre : '{$title}'");
+                }
+            } catch (\Throwable $e) {
+                $this->logger->error("❌ Erreur lors de l'import depuis IGDB : " . $e->getMessage());
+            }
+        }
+
+        if (!$game) {
+            $this->logger->warning("Jeu non trouvé pour le slug : '{$slug}' (ni en base, ni sur IGDB)");
             
             // Log tous les slugs disponibles pour debug
             $allSlugs = $gameRepository->createQueryBuilder('g')
@@ -445,6 +484,28 @@ class GameController extends AbstractController
 
         $this->logger->info("Jeu trouvé : '{$game->getTitle()}' pour le slug '{$slug}'");
         return $this->json($gameData, Response::HTTP_OK);
+    }
+
+    /**
+     * Extrait le titre du slug en enlevant l'ID IGDB à la fin
+     */
+    private function extractTitleFromSlug(string $slug): string
+    {
+        // Si le slug se termine par un tiret suivi de chiffres, c'est probablement un ID IGDB
+        if (preg_match('/^(.+)-\d+$/', $slug, $matches)) {
+            return $matches[1];
+        }
+        
+        return $slug;
+    }
+
+    /**
+     * Génère un slug propre à partir du titre
+     */
+    private function generateCleanSlug(string $title): string
+    {
+        $slugify = new \Cocur\Slugify\Slugify();
+        return $slugify->slugify($title);
     }
 
     #[Route('/api/games/search-with-fallback/{query}', name: 'api_game_search_with_fallback')]
@@ -556,5 +617,66 @@ class GameController extends AbstractController
             // Retourner une image par défaut ou une erreur plus descriptive
             return new Response('Erreur lors du chargement de l\'image: ' . $e->getMessage(), 500);
         }
+    }
+
+    /**
+     * Tente d'importer un jeu avec plusieurs variantes de recherche
+     */
+    private function tryImportWithVariants(string $title, GameImporter $gameImporter): ?\App\Entity\Game
+    {
+        // Liste des variantes à tester
+        $variants = [
+            $title, // Version originale
+            ucfirst($title), // Première lettre en majuscule
+            str_replace('-', ' ', $title), // Remplacer les tirets par des espaces
+            str_replace('-', ' ', ucfirst($title)), // Combinaison des deux
+        ];
+        
+        // Ajouter des variantes spécifiques pour certains jeux
+        $specificVariants = [
+            'oblivion' => ['The Elder Scrolls IV: Oblivion', 'Oblivion', 'TES IV: Oblivion'],
+            'skyrim' => ['The Elder Scrolls V: Skyrim', 'Skyrim', 'TES V: Skyrim'],
+            'morrowind' => ['The Elder Scrolls III: Morrowind', 'Morrowind', 'TES III: Morrowind'],
+            'fallout' => ['Fallout', 'Fallout 1', 'Fallout: A Post Nuclear Role Playing Game'],
+            'fallout-2' => ['Fallout 2', 'Fallout II'],
+            'fallout-3' => ['Fallout 3', 'Fallout III'],
+            'fallout-4' => ['Fallout 4', 'Fallout IV'],
+            'fallout-new-vegas' => ['Fallout: New Vegas', 'Fallout New Vegas'],
+            'final-fantasy' => ['Final Fantasy', 'Final Fantasy I'],
+            'final-fantasy-vi' => ['Final Fantasy VI', 'Final Fantasy 6', 'FF6'],
+            'final-fantasy-vii' => ['Final Fantasy VII', 'Final Fantasy 7', 'FF7'],
+            'final-fantasy-viii' => ['Final Fantasy VIII', 'Final Fantasy 8', 'FF8'],
+            'final-fantasy-ix' => ['Final Fantasy IX', 'Final Fantasy 9', 'FF9'],
+            'final-fantasy-x' => ['Final Fantasy X', 'Final Fantasy 10', 'FFX'],
+        ];
+        
+        // Ajouter les variantes spécifiques si elles existent
+        if (isset($specificVariants[$title])) {
+            $variants = array_merge($variants, $specificVariants[$title]);
+        }
+        
+        // Supprimer les doublons
+        $variants = array_unique($variants);
+        
+        $this->logger->info("Tentative d'import avec les variantes : " . implode(', ', $variants));
+        
+        // Tester chaque variante
+        foreach ($variants as $variant) {
+            try {
+                $this->logger->info("Test de la variante : '{$variant}'");
+                $importedGame = $gameImporter->importGameBySearch($variant);
+                
+                if ($importedGame) {
+                    $this->logger->info("✅ Succès avec la variante : '{$variant}' -> '{$importedGame->getTitle()}'");
+                    return $importedGame;
+                }
+            } catch (\Throwable $e) {
+                $this->logger->warning("❌ Échec avec la variante '{$variant}': " . $e->getMessage());
+                // Continuer avec la variante suivante
+            }
+        }
+        
+        $this->logger->warning("❌ Aucune variante n'a fonctionné pour : '{$title}'");
+        return null;
     }
 }
