@@ -262,8 +262,9 @@ EOT
 
     /**
      * Récupère les meilleurs jeux sortis dans les 365 derniers jours avec critères dynamiques.
+     * Critères optimisés pour les jeux récents de 2024-2025.
      */
-    public function getTopYearGames(int $minVotes = 80, int $minRating = 75): array
+    public function getTopYearGames(int $minVotes = 50, int $minRating = 80): array
     {
         $accessToken = $this->getAccessToken();
         $minVotes = (int)$minVotes;
@@ -277,7 +278,7 @@ EOT
             ],
             'body' => <<<EOT
 fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots, total_rating, total_rating_count, involved_companies.company.name;
-sort total_rating desc;
+sort total_rating desc, total_rating_count desc, first_release_date desc;
 where total_rating != null & total_rating_count >= $minVotes & total_rating >= $minRating & first_release_date >= $oneYearAgo;
 limit 100;
 EOT
