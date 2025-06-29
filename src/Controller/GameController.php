@@ -447,25 +447,69 @@ class GameController extends AbstractController
         return $this->json($result, $statusCode, [], ['groups' => 'game:read']);
     }
 
+    #[Route('/api/test', name: 'api_test')]
+    public function test(): JsonResponse
+    {
+        return $this->json([
+            'status' => 'ok',
+            'message' => 'API Symfony fonctionne correctement',
+            'timestamp' => (new \DateTime())->format('Y-m-d H:i:s')
+        ]);
+    }
+
     #[Route('/api/proxy/image', name: 'api_game_image_proxy')]
     public function imageProxy(Request $request): Response
     {
         $imageUrl = $request->query->get('url');
         
         if (!$imageUrl) {
+            $this->logger->error('Proxy image: URL manquante');
             return new Response('URL manquante', 400);
+        }
+        
+        // Décoder l'URL si elle est encodée
+        $imageUrl = urldecode($imageUrl);
+        
+        // Vérifier si l'URL contient déjà notre proxy (récursion)
+        if (strpos($imageUrl, '/api/proxy/image') !== false || 
+            strpos($imageUrl, '127.0.0.1:8000/api/proxy/image') !== false ||
+            strpos($imageUrl, 'localhost:8000/api/proxy/image') !== false) {
+            $this->logger->error('Proxy image: Récursion détectée', ['url' => $imageUrl]);
+            return new Response('Récursion détectée dans l\'URL', 400);
         }
         
         // Vérifie que c'est bien une URL IGDB
         if (strpos($imageUrl, 'images.igdb.com') === false) {
+            $this->logger->error('Proxy image: URL non autorisée', ['url' => $imageUrl]);
             return new Response('URL non autorisée', 403);
         }
         
+        // S'assurer que l'URL a le bon format
+        if (strpos($imageUrl, '//') === 0) {
+            $imageUrl = 'https:' . $imageUrl;
+        } elseif (!preg_match('/^https?:\/\//', $imageUrl)) {
+            $imageUrl = 'https://' . $imageUrl;
+        }
+        
         try {
+            $this->logger->info('Proxy image: Tentative de récupération', ['url' => $imageUrl]);
+            
             // Récupère l'image depuis IGDB
-            $response = $this->client->request('GET', $imageUrl);
+            $response = $this->client->request('GET', $imageUrl, [
+                'timeout' => 10,
+                'headers' => [
+                    'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                ]
+            ]);
+            
             $imageContent = $response->getContent();
             $contentType = $response->getHeaders()['content-type'][0] ?? 'image/jpeg';
+            
+            $this->logger->info('Proxy image: Image récupérée avec succès', [
+                'url' => $imageUrl,
+                'contentType' => $contentType,
+                'size' => strlen($imageContent)
+            ]);
             
             return new Response($imageContent, 200, [
                 'Content-Type' => $contentType,
@@ -473,7 +517,13 @@ class GameController extends AbstractController
                 'Access-Control-Allow-Origin' => '*'
             ]);
         } catch (\Exception $e) {
-            return new Response('Erreur lors du chargement de l\'image', 500);
+            $this->logger->error('Proxy image: Erreur lors du chargement', [
+                'url' => $imageUrl,
+                'error' => $e->getMessage()
+            ]);
+            
+            // Retourner une image par défaut ou une erreur plus descriptive
+            return new Response('Erreur lors du chargement de l\'image: ' . $e->getMessage(), 500);
         }
     }
 }
