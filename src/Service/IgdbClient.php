@@ -219,7 +219,7 @@ class IgdbClient
                 'Content-Type' => 'text/plain',
             ],
             'body' => <<<EOT
-            fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots, total_rating, involved_companies.company.name;
+            fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots, total_rating, involved_companies.company.name, category;
             sort total_rating desc;
             where total_rating != null;
             limit 500;
@@ -259,7 +259,7 @@ class IgdbClient
                 'Content-Type' => 'text/plain',
             ],
             'body' => <<<EOT
-fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots, total_rating, total_rating_count, involved_companies.company.name;
+fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots, total_rating, total_rating_count, involved_companies.company.name, category;
 sort total_rating desc;
 where total_rating != null & total_rating_count >= $minVotes & total_rating >= $minRating;
 limit 100;
@@ -296,7 +296,7 @@ EOT
                 'Content-Type' => 'text/plain',
             ],
             'body' => <<<EOT
-fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots, total_rating, total_rating_count, involved_companies.company.name;
+fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots, total_rating, total_rating_count, involved_companies.company.name, category;
 sort total_rating desc, total_rating_count desc, first_release_date desc;
 where total_rating != null & total_rating_count >= $minVotes & total_rating >= $minRating & first_release_date >= $oneYearAgo;
 limit 100;
@@ -337,7 +337,7 @@ EOT
                     'Content-Type' => 'text/plain',
                 ],
                 'body' => <<<EOT
-                fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots, total_rating, total_rating_count, involved_companies.company.name;
+                fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots, total_rating, total_rating_count, involved_companies.company.name, category;
                 where id = $gameId;
                 limit 1;
                 EOT

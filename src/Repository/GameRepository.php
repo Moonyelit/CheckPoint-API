@@ -120,4 +120,95 @@ class GameRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /**
+     * Retourne les meilleurs jeux des 365 derniers jours DÉDUPLIQUÉS par nom principal.
+     * Évite les doublons comme "Clair Obscur: Expedition 33" et "Clair Obscur: Expedition 33 – Deluxe Edition".
+     * Prend la version avec la meilleure note pour chaque nom principal.
+     * Filtre uniquement les jeux principaux (pas les DLC/expansions).
+     *
+     * @param int $limit Nombre maximum de jeux à retourner
+     * @param int $minRating Note minimum (sur 100)
+     * @param int $minVotes Nombre minimum de votes
+     * @return Game[]
+     */
+    public function findTopYearGamesDeduplicated(int $limit = 5, int $minRating = 80, int $minVotes = 80): array
+    {
+        $oneYearAgo = new \DateTimeImmutable('-365 days');
+
+        // Récupère tous les jeux qui respectent les critères
+        $allGames = $this->createQueryBuilder('g')
+            ->andWhere('g.releaseDate >= :oneYearAgo')
+            ->andWhere('g.totalRating IS NOT NULL')
+            ->andWhere('g.totalRating >= :minRating')
+            ->andWhere('(g.totalRatingCount >= :minVotes OR g.totalRatingCount IS NULL)')
+            // Filtre uniquement les jeux principaux (category = 0 ou null)
+            ->andWhere('(g.category = 0 OR g.category IS NULL)')
+            ->setParameter('oneYearAgo', $oneYearAgo)
+            ->setParameter('minRating', $minRating)
+            ->setParameter('minVotes', $minVotes)
+            ->orderBy('g.totalRating', 'DESC')
+            ->addOrderBy('g.totalRatingCount', 'DESC')
+            ->getQuery()
+            ->getResult();
+
+        // Groupe les jeux par nom principal et garde le meilleur de chaque groupe
+        $groupedGames = [];
+
+        foreach ($allGames as $game) {
+            $mainTitle = $this->extractMainTitle($game->getTitle());
+            
+            // Si on n'a pas encore vu ce titre principal, ou si ce jeu a une meilleure note
+            if (!isset($groupedGames[$mainTitle]) || 
+                $game->getTotalRating() > $groupedGames[$mainTitle]->getTotalRating() ||
+                ($game->getTotalRating() == $groupedGames[$mainTitle]->getTotalRating() && 
+                 $game->getTotalRatingCount() > $groupedGames[$mainTitle]->getTotalRatingCount())) {
+                
+                $groupedGames[$mainTitle] = $game;
+            }
+        }
+
+        // Trie par note décroissante
+        uasort($groupedGames, function($a, $b) {
+            if ($a->getTotalRating() != $b->getTotalRating()) {
+                return $b->getTotalRating() <=> $a->getTotalRating();
+            }
+            return $b->getTotalRatingCount() <=> $a->getTotalRatingCount();
+        });
+
+        // Prend les premiers selon la limite
+        return array_slice(array_values($groupedGames), 0, $limit);
+    }
+
+    /**
+     * Extrait le nom principal d'un titre de jeu avec une regex générique.
+     * Supprime les suffixes courants (Edition, Remake, Remastered, DLC, Update, Pass, etc.).
+     *
+     * @param string $title Le titre complet du jeu
+     * @return string Le nom principal du jeu
+     */
+    private function extractMainTitle(string $title): string
+    {
+        // Normaliser les tirets et espaces spéciaux
+        $normalized = str_replace([
+            '\x{2013}', // EN DASH
+            '\x{2014}', // EM DASH
+            '\x{00A0}', // espace insécable
+            '–', // EN DASH
+            '—', // EM DASH
+            chr(194).chr(160), // espace insécable utf-8
+        ], ['-', '-', ' ', '-', '-', ' '], $title);
+
+        // Regex pour supprimer les suffixes courants après :, -, ou espace
+        $mainTitle = preg_replace(
+            '/([:\-\s])\s*(Deluxe Edition|Ultimate Edition|Collector\'s Edition|Friend\'s Pass|Season Pass|Vicious Void|Vicious Void Galaxy|Winter Wonder|Stellar Speedway|A Big Adventure|Costume|Remastered|Remake|Definitive Edition|DLC|Update|Expansion|Galaxy|Wonder|Speedway|Pass|Edition)$/iu',
+            '',
+            $normalized
+        );
+
+        // Nettoyer les séparateurs qui restent à la fin
+        $mainTitle = preg_replace('/([:\-])\s*$/u', '', $mainTitle);
+
+        return trim($mainTitle);
+    }
 }

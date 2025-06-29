@@ -126,6 +126,10 @@ class Game
     #[Groups(['game:read'])]
     private ?\DateTimeImmutable $lastPopularityUpdate = null;
 
+    #[ORM\Column(length: 50, nullable: true)]
+    #[Groups(['game:read', 'game:write'])]
+    private ?string $category = null;
+
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
@@ -438,6 +442,18 @@ class Game
     public function setLastPopularityUpdate(?\DateTimeImmutable $lastPopularityUpdate): static
     {
         $this->lastPopularityUpdate = $lastPopularityUpdate;
+
+        return $this;
+    }
+
+    public function getCategory(): ?string
+    {
+        return $this->category;
+    }
+
+    public function setCategory(?string $category): static
+    {
+        $this->category = $category;
 
         return $this;
     }

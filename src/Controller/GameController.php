@@ -148,7 +148,7 @@ class GameController extends AbstractController
     #[Route('/admin/import-top100-games', name: 'admin_import_top100_games')]
     public function importTop100Games(GameImporter $importer): Response
     {
-        // Importe les jeux du Top 100 d'IGDB avec critères stricts
+        // Importe les jeux du Top 100 d'IGDB
         $importer->importTop100Games(80, 75);
         return new Response('Import du Top 100 IGDB terminé !');
     }
@@ -302,8 +302,9 @@ class GameController extends AbstractController
     {
         $limit = (int) $request->query->get('limit', 5);
         
-        // Récupère les jeux de l'année (365 derniers jours) avec critères stricts
-        $games = $gameRepository->findTopYearGamesWithCriteria($limit, 80, 80);
+        // Récupère les jeux de l'année (365 derniers jours) DÉDUPLIQUÉS par nom principal
+        // Évite les doublons comme "Clair Obscur: Expedition 33" et "Clair Obscur: Expedition 33 – Deluxe Edition"
+        $games = $gameRepository->findTopYearGamesDeduplicated($limit, 80, 80);
         
         // Améliore automatiquement la qualité des images pour chaque jeu
         foreach ($games as $game) {

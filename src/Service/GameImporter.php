@@ -124,6 +124,11 @@ class GameImporter
 
                 $existingGame->setUpdatedAt(new \DateTimeImmutable());
 
+                // Sauvegarde la catégorie (taxonomie du jeu)
+                if (isset($apiGame['category'])) {
+                    $existingGame->setCategory($apiGame['category']);
+                }
+
                 // Pas besoin de créer un nouveau jeu, on passe au suivant
                 continue;
             }
@@ -184,6 +189,15 @@ class GameImporter
                     $screenshot->setGame($game);
                     $game->addScreenshot($screenshot);
                 }
+            }
+
+            $game->setTotalRatingCount($apiGame['total_rating_count'] ?? null);
+            $game->setFollows($apiGame['follows'] ?? null);
+            $game->setLastPopularityUpdate(new \DateTimeImmutable());
+
+            // Sauvegarde la catégorie (taxonomie du jeu)
+            if (isset($apiGame['category'])) {
+                $game->setCategory($apiGame['category']);
             }
 
             $game->setCreatedAt(new \DateTimeImmutable());
@@ -257,6 +271,12 @@ class GameImporter
                 }
 
                 $existingGame->setUpdatedAt(new \DateTimeImmutable());
+
+                // Sauvegarde la catégorie (taxonomie du jeu)
+                if (isset($apiGame['category'])) {
+                    $existingGame->setCategory($apiGame['category']);
+                }
+
                 continue;
             }
 
@@ -321,6 +341,11 @@ class GameImporter
                     $screenshot->setGame($game);
                     $game->addScreenshot($screenshot);
                 }
+            }
+
+            // Sauvegarde la catégorie (taxonomie du jeu)
+            if (isset($apiGame['category'])) {
+                $game->setCategory($apiGame['category']);
             }
 
             $game->setCreatedAt(new \DateTimeImmutable());
@@ -524,6 +549,15 @@ class GameImporter
                 }
             }
 
+            $game->setTotalRatingCount($apiGame['total_rating_count'] ?? null);
+            $game->setFollows($apiGame['follows'] ?? null);
+            $game->setLastPopularityUpdate(new \DateTimeImmutable());
+
+            // Sauvegarde la catégorie (taxonomie du jeu)
+            if (isset($apiGame['category'])) {
+                $game->setCategory($apiGame['category']);
+            }
+
             $game->setUpdatedAt(new \DateTimeImmutable());
 
             $this->entityManager->persist($game);
@@ -606,6 +640,15 @@ class GameImporter
                     $screenshot->setGame($game);
                     $game->addScreenshot($screenshot);
                 }
+            }
+
+            $game->setTotalRatingCount($apiGame['total_rating_count'] ?? null);
+            $game->setFollows($apiGame['follows'] ?? null);
+            $game->setLastPopularityUpdate(new \DateTimeImmutable());
+
+            // Sauvegarde la catégorie (taxonomie du jeu)
+            if (isset($apiGame['category'])) {
+                $game->setCategory($apiGame['category']);
             }
 
             $game->setUpdatedAt(new \DateTimeImmutable());
