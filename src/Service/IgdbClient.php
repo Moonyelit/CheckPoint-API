@@ -245,24 +245,13 @@ class IgdbClient
     }
 
     /**
-     * Récupère les jeux du Top 100 d'IGDB.
-     *
-     * Cette méthode récupère les vrais hits récents et AAA classiques :
-     * - Jeux très récents (2024-2025) comme Clair Obscur avec critères souples
-     * - Jeux récents populaires (2018+) comme Baldur's Gate 3, Elden Ring
-     * - AAA classiques avec beaucoup de votes
-     *
-     * @return array La liste des jeux du top 100.
+     * Récupère les jeux du Top 100 d'IGDB avec critères dynamiques.
      */
-    public function getTop100Games(): array
+    public function getTop100Games(int $minVotes = 80, int $minRating = 75): array
     {
         $accessToken = $this->getAccessToken();
-
-        // Calcul des dates (timestamp Unix)
-        $year2024 = (new \DateTime('2024-01-01'))->getTimestamp();
-        $year2018 = (new \DateTime('2018-01-01'))->getTimestamp();
-
-        // Effectue une requête POST pour récupérer les jeux du top 100
+        $minVotes = (int)$minVotes;
+        $minRating = (int)$minRating;
         $response = $this->client->request('POST', 'https://api.igdb.com/v4/games', [
             'headers' => [
                 'Client-ID' => $this->clientId,
@@ -270,16 +259,13 @@ class IgdbClient
                 'Content-Type' => 'text/plain',
             ],
             'body' => <<<EOT
-            fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots, total_rating, total_rating_count, involved_companies.company.name;
-            sort total_rating desc;
-            where (first_release_date >= $year2024 & total_rating >= 85 & total_rating_count >= 100) | (first_release_date >= $year2018 & total_rating >= 88 & total_rating_count >= 200) | (total_rating >= 90 & total_rating_count >= 500);
-            limit 100;
-            EOT
+fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots, total_rating, total_rating_count, involved_companies.company.name;
+sort total_rating desc;
+where total_rating != null & total_rating_count >= $minVotes & total_rating >= $minRating;
+limit 100;
+EOT
         ]);
-
         $games = $response->toArray();
-        
-        // Améliore la qualité des images de couverture
         foreach ($games as &$game) {
             if (isset($game['cover']['url'])) {
                 // S'assurer que l'URL a le bon format
@@ -290,29 +276,19 @@ class IgdbClient
                 $game['cover']['url'] = $this->improveImageQuality($imageUrl, 't_cover_big');
             }
         }
-
         return $games;
     }
 
     /**
-     * Récupère les meilleurs jeux sortis dans les 365 derniers jours.
-     *
-     * Cette méthode récupère les jeux récents les mieux notés :
-     * - Jeux sortis dans les 365 derniers jours
-     * - Note minimum 80/100 et au moins 80 votes
-     * - Triés par note décroissante
-     *
-     * @return array La liste des jeux de l'année.
+     * Récupère les meilleurs jeux sortis dans les 365 derniers jours avec critères dynamiques.
+     * Critères optimisés pour les jeux récents de 2024-2025.
      */
-    public function getTopYearGames(): array
+    public function getTopYearGames(int $minVotes = 50, int $minRating = 80): array
     {
         $accessToken = $this->getAccessToken();
-
-        // Calcul de la date pour les 365 derniers jours (timestamp Unix)
-        $oneYearAgo = (new \DateTime('-365 days'))->getTimestamp();
-        $now = (new \DateTime())->getTimestamp();
-
-        // Effectue une requête POST pour récupérer les jeux de l'année
+        $minVotes = (int)$minVotes;
+        $minRating = (int)$minRating;
+        $oneYearAgo = (new \DateTimeImmutable('-365 days'))->getTimestamp();
         $response = $this->client->request('POST', 'https://api.igdb.com/v4/games', [
             'headers' => [
                 'Client-ID' => $this->clientId,
@@ -320,16 +296,13 @@ class IgdbClient
                 'Content-Type' => 'text/plain',
             ],
             'body' => <<<EOT
-            fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots, total_rating, total_rating_count, involved_companies.company.name;
-            sort total_rating desc;
-            where first_release_date >= $oneYearAgo & first_release_date <= $now & total_rating >= 80 & total_rating_count >= 80;
-            limit 50;
-            EOT
+fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots, total_rating, total_rating_count, involved_companies.company.name;
+sort total_rating desc, total_rating_count desc, first_release_date desc;
+where total_rating != null & total_rating_count >= $minVotes & total_rating >= $minRating & first_release_date >= $oneYearAgo;
+limit 100;
+EOT
         ]);
-
         $games = $response->toArray();
-        
-        // Améliore la qualité des images de couverture
         foreach ($games as &$game) {
             if (isset($game['cover']['url'])) {
                 $imageUrl = $game['cover']['url'];
@@ -339,7 +312,6 @@ class IgdbClient
                 $game['cover']['url'] = $this->improveImageQuality($imageUrl, 't_cover_big');
             }
         }
-
         return $games;
     }
 

@@ -12,6 +12,7 @@ use Symfony\Component\RateLimiter\RateLimiterFactory;
 use Symfony\Component\DependencyInjection\Attribute\Autowire;
 use Symfony\Component\HttpKernel\Exception\TooManyRequestsHttpException;
 use Psr\Log\LoggerInterface;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 use App\Service\GameImporter;
 use App\Repository\GameRepository;
@@ -64,6 +65,7 @@ class GameController extends AbstractController
     public function __construct(
         #[Autowire(service: 'limiter.apiSearchLimit')] RateLimiterFactory $apiSearchLimitFactory,
         private GameSearchService $gameSearchService,
+        private HttpClientInterface $client,
         LoggerInterface $logger
     ) {
         $this->limiter = $apiSearchLimitFactory->create(); // Crée une instance de LimiterInterface
@@ -146,18 +148,16 @@ class GameController extends AbstractController
     #[Route('/admin/import-top100-games', name: 'admin_import_top100_games')]
     public function importTop100Games(GameImporter $importer): Response
     {
-        // Importe les jeux du Top 100 d'IGDB.
-        $importer->importTop100Games();
-    
+        // Importe les jeux du Top 100 d'IGDB avec critères stricts
+        $importer->importTop100Games(80, 75);
         return new Response('Import du Top 100 IGDB terminé !');
     }
 
     #[Route('/admin/import-top-year-games', name: 'admin_import_top_year_games')]
     public function importTopYearGames(GameImporter $importer): Response
     {
-        // Importe les meilleurs jeux de l'année (365 derniers jours).
-        $count = $importer->importTopYearGames();
-    
+        // Importe les meilleurs jeux de l'année (365 derniers jours) avec critères stricts
+        $count = $importer->importTopYearGames(80, 75);
         return new Response("Import des jeux de l'année terminé ! {$count} jeux traités.");
     }
 
@@ -445,5 +445,35 @@ class GameController extends AbstractController
         $statusCode = $result['source'] === 'error' ? 500 : 
                      ($result['total'] === 0 ? 404 : 200);
         return $this->json($result, $statusCode, [], ['groups' => 'game:read']);
+    }
+
+    #[Route('/api/proxy/image', name: 'api_game_image_proxy')]
+    public function imageProxy(Request $request): Response
+    {
+        $imageUrl = $request->query->get('url');
+        
+        if (!$imageUrl) {
+            return new Response('URL manquante', 400);
+        }
+        
+        // Vérifie que c'est bien une URL IGDB
+        if (strpos($imageUrl, 'images.igdb.com') === false) {
+            return new Response('URL non autorisée', 403);
+        }
+        
+        try {
+            // Récupère l'image depuis IGDB
+            $response = $this->client->request('GET', $imageUrl);
+            $imageContent = $response->getContent();
+            $contentType = $response->getHeaders()['content-type'][0] ?? 'image/jpeg';
+            
+            return new Response($imageContent, 200, [
+                'Content-Type' => $contentType,
+                'Cache-Control' => 'public, max-age=86400', // Cache 24h
+                'Access-Control-Allow-Origin' => '*'
+            ]);
+        } catch (\Exception $e) {
+            return new Response('Erreur lors du chargement de l\'image', 500);
+        }
     }
 }

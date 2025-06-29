@@ -60,7 +60,10 @@ class GameRepository extends ServiceEntityRepository
     {
         return $this->createQueryBuilder('g')
             ->andWhere('g.totalRating IS NOT NULL')
+            ->andWhere('g.totalRating >= 75')
+            ->andWhere('g.totalRatingCount >= 80')
             ->orderBy('g.totalRating', 'DESC')
+            ->addOrderBy('g.totalRatingCount', 'DESC')
             ->setMaxResults($limit)
             ->getQuery()
             ->getResult();
@@ -75,15 +78,15 @@ class GameRepository extends ServiceEntityRepository
     public function findTopYearGames(int $limit = 5): array
     {
         $oneYearAgo = new \DateTimeImmutable('-365 days');
-
         return $this->createQueryBuilder('g')
             ->andWhere('g.releaseDate >= :oneYearAgo')
             ->andWhere('g.totalRating IS NOT NULL')
-            ->andWhere('g.totalRating >= 70')
+            ->andWhere('g.totalRating >= 80')
             ->andWhere('g.totalRatingCount >= 50')
             ->setParameter('oneYearAgo', $oneYearAgo)
             ->orderBy('g.totalRating', 'DESC')
             ->addOrderBy('g.totalRatingCount', 'DESC')
+            ->addOrderBy('g.releaseDate', 'DESC')
             ->setMaxResults($limit)
             ->getQuery()
             ->getResult();

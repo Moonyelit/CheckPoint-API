@@ -56,14 +56,47 @@ class ImportTopYearGamesCommand extends Command
         $io = new SymfonyStyle($input, $output);
 
         $io->title('🆕 Import des meilleurs jeux de l\'année (365 derniers jours)');
-        $io->info('Critères : Sortis dans les 365 derniers jours, Note ≥75, Votes ≥100');
+        $io->info('Critères : Sortis dans les 365 derniers jours, Note ≥8.0/10 (80/100), Votes ≥50');
         $io->text('🎯 Priorité HeroBanner : Ces jeux s\'affichent en PREMIER sur la page d\'accueil');
+        $io->text('🎮 Jeux prioritaires : Clair Obscur, Split Fiction, Astro Bot, etc.');
 
         try {
-            $importedCount = $this->gameImporter->importTopYearGames();
+            // Import des jeux spécifiques en priorité
+            $io->section('🎯 Import des jeux prioritaires');
+            $priorityGames = [
+                'Clair Obscur: Expedition 33',
+                'Split Fiction',
+                'Astro Bot',
+                'Black Myth: Wukong',
+                'Silent Hill 2 Remake',
+                'Indiana Jones and the Great Circle',
+                'Dragon Age: Dreadwolf',
+                'Final Fantasy VII Rebirth',
+                'Spider-Man 2',
+                'Zelda: Echoes of Wisdom'
+            ];
             
-            $io->success("✅ Import terminé ! {$importedCount} jeux de l'année traités.");
+            $importedPriority = 0;
+            foreach ($priorityGames as $gameTitle) {
+                try {
+                    $game = $this->gameImporter->importGameBySearch($gameTitle);
+                    if ($game) {
+                        $importedPriority++;
+                        $io->text("✅ Importé : {$gameTitle}");
+                    }
+                } catch (\Exception $e) {
+                    $io->text("⚠️ Non trouvé : {$gameTitle}");
+                }
+            }
+            
+            // Import général des jeux de l'année
+            $io->section('📥 Import général des jeux de l\'année');
+            $importedCount = $this->gameImporter->importTopYearGames(50, 80); // Votes ≥50, Note ≥8.0/10
+            
+            $io->success("✅ Import terminé ! {$importedPriority} jeux prioritaires + {$importedCount} jeux de l'année traités.");
             $io->text('💡 Ces jeux alimentent l\'endpoint /api/games/top100-year');
+            $io->text('🎯 Critères mis à jour : Note ≥8.0/10, Votes ≥50, Priorité aux jeux récents');
+            $io->text('🔄 Relancez la commande si les jeux souhaités ne sont pas encore dans IGDB');
             
             return Command::SUCCESS;
         } catch (\Exception $e) {

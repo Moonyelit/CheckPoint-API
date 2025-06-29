@@ -62,10 +62,10 @@ class ImportTop100GamesCommand extends Command
         $io = new SymfonyStyle($input, $output);
         
         $io->title('🏆 Import du Top 100 de tous les temps');
-        $io->text('Critères renforcés : Jeux 2024-2025 (≥85/100, ≥100 votes), Jeux 2018+ (≥88/100, ≥200 votes), Classiques (≥90/100, ≥500 votes)');
+        $io->text('Critères : Note ≥ 7.5/10 (75/100), Votes ≥ 80');
 
         // Import des jeux
-        $this->importer->importTop100Games();
+        $this->importer->importTop100Games(80, 75);
 
         $io->success('✅ Import du Top 100 terminé !');
         
