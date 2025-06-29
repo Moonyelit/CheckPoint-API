@@ -96,7 +96,9 @@ class GameImporter
                     $existingGame->setCoverUrl($highQualityUrl);
                 }
                 
-                $existingGame->setTotalRating($apiGame['total_rating'] ?? $existingGame->getTotalRating());
+                if (array_key_exists('total_rating', $apiGame) && $apiGame['total_rating'] !== null) {
+                    $existingGame->setTotalRating($apiGame['total_rating']);
+                }
 
                 if (isset($apiGame['first_release_date'])) {
                     $existingGame->setReleaseDate((new \DateTime())->setTimestamp($apiGame['first_release_date']));
@@ -125,7 +127,7 @@ class GameImporter
                 $existingGame->setUpdatedAt(new \DateTimeImmutable());
 
                 // Sauvegarde la catégorie (taxonomie du jeu)
-                if (isset($apiGame['category'])) {
+                if (array_key_exists('category', $apiGame)) {
                     $existingGame->setCategory($apiGame['category']);
                 }
 
@@ -151,7 +153,9 @@ class GameImporter
                 $game->setCoverUrl($highQualityUrl);
             }
             
-            $game->setTotalRating($apiGame['total_rating'] ?? null);
+            if (array_key_exists('total_rating', $apiGame) && $apiGame['total_rating'] !== null) {
+                $game->setTotalRating($apiGame['total_rating']);
+            }
 
             if (isset($apiGame['first_release_date'])) {
                 $game->setReleaseDate((new \DateTime())->setTimestamp($apiGame['first_release_date']));
@@ -191,12 +195,14 @@ class GameImporter
                 }
             }
 
-            $game->setTotalRatingCount($apiGame['total_rating_count'] ?? null);
+            if (array_key_exists('total_rating_count', $apiGame)) {
+                $game->setTotalRatingCount($apiGame['total_rating_count']);
+            }
             $game->setFollows($apiGame['follows'] ?? null);
             $game->setLastPopularityUpdate(new \DateTimeImmutable());
 
             // Sauvegarde la catégorie (taxonomie du jeu)
-            if (isset($apiGame['category'])) {
+            if (array_key_exists('category', $apiGame)) {
                 $game->setCategory($apiGame['category']);
             }
 
@@ -239,10 +245,14 @@ class GameImporter
                     $existingGame->setCoverUrl($highQualityUrl);
                 }
                 
-                $existingGame->setTotalRating($apiGame['total_rating'] ?? $existingGame->getTotalRating());
+                if (array_key_exists('total_rating', $apiGame)) {
+                    $existingGame->setTotalRating($apiGame['total_rating']);
+                }
 
                 // Mise à jour des statistiques de rating
-                $existingGame->setTotalRatingCount($apiGame['total_rating_count'] ?? null);
+                if (array_key_exists('total_rating_count', $apiGame)) {
+                    $existingGame->setTotalRatingCount($apiGame['total_rating_count']);
+                }
                 $existingGame->setFollows($apiGame['follows'] ?? $existingGame->getFollows());
                 $existingGame->setLastPopularityUpdate(new \DateTimeImmutable());
 
@@ -273,7 +283,7 @@ class GameImporter
                 $existingGame->setUpdatedAt(new \DateTimeImmutable());
 
                 // Sauvegarde la catégorie (taxonomie du jeu)
-                if (isset($apiGame['category'])) {
+                if (array_key_exists('category', $apiGame)) {
                     $existingGame->setCategory($apiGame['category']);
                 }
 
@@ -298,10 +308,14 @@ class GameImporter
                 $game->setCoverUrl($highQualityUrl);
             }
             
-            $game->setTotalRating($apiGame['total_rating'] ?? null);
+            if (array_key_exists('total_rating', $apiGame) && $apiGame['total_rating'] !== null) {
+                $game->setTotalRating($apiGame['total_rating']);
+            }
 
             // Ajout des statistiques de rating du top 100
-            $game->setTotalRatingCount($apiGame['total_rating_count'] ?? null);
+            if (array_key_exists('total_rating_count', $apiGame)) {
+                $game->setTotalRatingCount($apiGame['total_rating_count']);
+            }
             $game->setFollows($apiGame['follows'] ?? null);
             $game->setLastPopularityUpdate(new \DateTimeImmutable());
 
@@ -344,7 +358,7 @@ class GameImporter
             }
 
             // Sauvegarde la catégorie (taxonomie du jeu)
-            if (isset($apiGame['category'])) {
+            if (array_key_exists('category', $apiGame)) {
                 $game->setCategory($apiGame['category']);
             }
 
@@ -390,7 +404,23 @@ class GameImporter
         }
         
         $game->setSummary($apiGame['summary'] ?? null);
-        $game->setTotalRating($apiGame['total_rating'] ?? null);
+        if (array_key_exists('total_rating', $apiGame)) {
+            $game->setTotalRating($apiGame['total_rating']);
+        }
+
+        // Ajout des statistiques de rating et popularité
+        if (array_key_exists('total_rating_count', $apiGame)) {
+            $game->setTotalRatingCount($apiGame['total_rating_count']);
+        }
+        if (array_key_exists('follows', $apiGame)) {
+            $game->setFollows($apiGame['follows']);
+        }
+        $game->setLastPopularityUpdate(new \DateTimeImmutable());
+
+        // Sauvegarde la catégorie (taxonomie du jeu)
+        if (array_key_exists('category', $apiGame)) {
+            $game->setCategory($apiGame['category']);
+        }
 
         if (isset($apiGame['first_release_date'])) {
             $game->setReleaseDate((new \DateTime())->setTimestamp($apiGame['first_release_date']));
@@ -461,7 +491,9 @@ class GameImporter
             $game->setSlug($this->slugify->slugify($title));
             
             $game->setSummary($apiGame['summary'] ?? null);
-            $game->setTotalRating($apiGame['total_rating'] ?? null);
+            if (array_key_exists('total_rating', $apiGame)) {
+                $game->setTotalRating($apiGame['total_rating']);
+            }
 
             if (isset($apiGame['first_release_date'])) {
                 $game->setReleaseDate((new \DateTime())->setTimestamp($apiGame['first_release_date']));
@@ -549,12 +581,14 @@ class GameImporter
                 }
             }
 
-            $game->setTotalRatingCount($apiGame['total_rating_count'] ?? null);
+            if (array_key_exists('total_rating_count', $apiGame)) {
+                $game->setTotalRatingCount($apiGame['total_rating_count']);
+            }
             $game->setFollows($apiGame['follows'] ?? null);
             $game->setLastPopularityUpdate(new \DateTimeImmutable());
 
             // Sauvegarde la catégorie (taxonomie du jeu)
-            if (isset($apiGame['category'])) {
+            if (array_key_exists('category', $apiGame)) {
                 $game->setCategory($apiGame['category']);
             }
 
@@ -579,17 +613,22 @@ class GameImporter
         foreach ($games as $apiGame) {
             $count++;
             $igdbId = $apiGame['id'];
+            $title = $apiGame['name'] ?? 'Titre inconnu';
+            $slug = $this->slugify->slugify($title);
 
+            // Vérifie si le jeu existe déjà par igdbId OU par slug
             $game = $this->gameRepository->findOneBy(['igdbId' => $igdbId]);
+            if (!$game) {
+                $game = $this->gameRepository->findOneBy(['slug' => $slug]);
+            }
 
             if (!$game) {
                 $game = new Game();
                 $game->setIgdbId($igdbId);
             }
 
-            $title = $apiGame['name'] ?? 'Titre inconnu';
             $game->setTitle($title);
-            $game->setSlug($this->slugify->slugify($title));
+            $game->setSlug($slug);
 
             if (isset($apiGame['cover']['url'])) {
                 $imageUrl = $apiGame['cover']['url'];
@@ -601,8 +640,21 @@ class GameImporter
             }
 
             $game->setSummary($apiGame['summary'] ?? null);
-            $game->setTotalRating($apiGame['total_rating'] ?? null);
-            $game->setTotalRatingCount($apiGame['total_rating_count'] ?? null);
+            if (array_key_exists('total_rating', $apiGame)) {
+                $game->setTotalRating($apiGame['total_rating']);
+            }
+            if (array_key_exists('total_rating_count', $apiGame)) {
+                $game->setTotalRatingCount($apiGame['total_rating_count']);
+            }
+            if (array_key_exists('follows', $apiGame)) {
+                $game->setFollows($apiGame['follows']);
+            }
+            $game->setLastPopularityUpdate(new \DateTimeImmutable());
+
+            // Sauvegarde la catégorie (taxonomie du jeu)
+            if (array_key_exists('category', $apiGame)) {
+                $game->setCategory($apiGame['category']);
+            }
 
             if (isset($apiGame['first_release_date'])) {
                 $game->setReleaseDate((new \DateTime())->setTimestamp($apiGame['first_release_date']));
@@ -640,15 +692,6 @@ class GameImporter
                     $screenshot->setGame($game);
                     $game->addScreenshot($screenshot);
                 }
-            }
-
-            $game->setTotalRatingCount($apiGame['total_rating_count'] ?? null);
-            $game->setFollows($apiGame['follows'] ?? null);
-            $game->setLastPopularityUpdate(new \DateTimeImmutable());
-
-            // Sauvegarde la catégorie (taxonomie du jeu)
-            if (isset($apiGame['category'])) {
-                $game->setCategory($apiGame['category']);
             }
 
             $game->setUpdatedAt(new \DateTimeImmutable());

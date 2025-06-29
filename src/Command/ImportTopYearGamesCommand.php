@@ -59,10 +59,14 @@ class ImportTopYearGamesCommand extends Command
         $io->info('Critères : Sortis dans les 365 derniers jours, Note ≥8.0/10 (80/100), Votes ≥50');
         $io->text('🎯 Priorité HeroBanner : Ces jeux s\'affichent en PREMIER sur la page d\'accueil');
         $io->text('🎮 Jeux prioritaires : Clair Obscur, Split Fiction, Astro Bot, etc.');
+        $io->text('📊 Champs récupérés : total_rating, total_rating_count, category, follows, last_popularity_update');
 
         try {
             // Import des jeux spécifiques en priorité
-            $io->section('🎯 Import des jeux prioritaires');
+            // 🛡️ FILET DE SÉCURITÉ : Ces jeux sont importés manuellement par recherche
+            // pour garantir qu'ils soient toujours présents, même si l'import général échoue.
+            // Cela évite d'avoir un carrousel vide en cas de problème avec l'API IGDB.
+            $io->section('🎯 Import des jeux prioritaires (Filet de sécurité)');
             $priorityGames = [
                 'Clair Obscur: Expedition 33',
                 'Split Fiction',
@@ -73,7 +77,8 @@ class ImportTopYearGamesCommand extends Command
                 'Dragon Age: Dreadwolf',
                 'Final Fantasy VII Rebirth',
                 'Spider-Man 2',
-                'Zelda: Echoes of Wisdom'
+                'Zelda: Echoes of Wisdom',
+                'Kingdom Come: Deliverance II'
             ];
             
             $importedPriority = 0;

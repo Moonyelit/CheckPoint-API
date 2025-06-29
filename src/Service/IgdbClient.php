@@ -125,7 +125,7 @@ class IgdbClient
                 'Content-Type' => 'text/plain',
             ],
             'body' => <<<EOT
-                fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots;
+                fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots, total_rating, total_rating_count, follows, involved_companies.company.name, category;
                 search "$search";
                 limit $limit;
                 offset $offset;
@@ -297,9 +297,9 @@ EOT
             ],
             'body' => <<<EOT
 fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots, total_rating, total_rating_count, involved_companies.company.name, category;
-sort total_rating desc, total_rating_count desc, first_release_date desc;
-where total_rating != null & total_rating_count >= $minVotes & total_rating >= $minRating & first_release_date >= $oneYearAgo;
-limit 100;
+sort total_rating desc;
+where total_rating != null;
+limit 50;
 EOT
         ]);
         $games = $response->toArray();

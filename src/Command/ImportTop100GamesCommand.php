@@ -63,6 +63,7 @@ class ImportTop100GamesCommand extends Command
         
         $io->title('🏆 Import du Top 100 de tous les temps');
         $io->text('Critères : Note ≥ 7.5/10 (75/100), Votes ≥ 80');
+        $io->text('📊 Champs récupérés : total_rating, total_rating_count, category, follows, last_popularity_update');
 
         // Import des jeux
         $this->importer->importTop100Games(80, 75);
