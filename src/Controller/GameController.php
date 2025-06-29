@@ -142,7 +142,7 @@ class GameController extends AbstractController
                     'limit' => $limit,
                     'offset' => $offset,
                     'totalCount' => $totalCount,
-                    'totalPages' => ceil($totalCount / $limit)
+                    'totalPages' => max(1, ceil($totalCount / $limit))
                 ],
                 'source' => $result['source'],
                 'message' => $result['message']
