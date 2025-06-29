@@ -42,22 +42,7 @@ class GameSearchService
         $localGames = $this->gameRepository->findByTitleLike($query);
         $this->logger->info(sprintf("Trouvé %d jeux en base locale", count($localGames)));
 
-        // Si on a des résultats locaux et qu'on ne force pas IGDB
-        if (!empty($localGames) && !$forceIgdb) {
-            // Lance l'import en arrière-plan pour enrichir la base
-            $this->enrichInBackground($query);
-            
-            return [
-                'games' => $localGames,
-                'source' => 'local',
-                'message' => 'Jeux trouvés en base locale',
-                'total' => count($localGames),
-                'local_count' => count($localGames),
-                'igdb_count' => 0
-            ];
-        }
-
-        // 2. Recherche sur IGDB
+        // 2. Recherche sur IGDB (toujours effectuée pour enrichir les résultats)
         $igdbGames = [];
         try {
             $igdbGames = $this->gameImporter->importGamesBySearch($query);
@@ -89,13 +74,13 @@ class GameSearchService
             ];
         }
 
-        // 3. Fusion intelligente des résultats
+        // 3. Fusion intelligente des résultats (toujours effectuée)
         $finalGames = $this->mergeResults($localGames, $igdbGames);
         
         return [
             'games' => $finalGames,
             'source' => empty($localGames) ? 'igdb' : 'mixed',
-            'message' => empty($localGames) ? 'Jeux importés depuis IGDB' : 'Résultats fusionnés',
+            'message' => empty($localGames) ? 'Jeux importés depuis IGDB' : 'Résultats fusionnés (local + IGDB)',
             'total' => count($finalGames),
             'local_count' => count($localGames),
             'igdb_count' => count($igdbGames)
@@ -165,19 +150,5 @@ class GameSearchService
         }
         
         return $finalGames;
-    }
-
-    /**
-     * Enrichit la base en arrière-plan
-     */
-    private function enrichInBackground(string $query): void
-    {
-        // En production, utilise un job queue (Symfony Messenger, etc.)
-        try {
-            $this->gameImporter->importGamesBySearch($query);
-            $this->logger->info("Enrichissement en arrière-plan terminé pour : '{$query}'");
-        } catch (\Throwable $e) {
-            $this->logger->error("Erreur enrichissement arrière-plan : " . $e->getMessage());
-        }
     }
 } 
