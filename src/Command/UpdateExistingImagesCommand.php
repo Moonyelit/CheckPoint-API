@@ -81,11 +81,11 @@ class UpdateExistingImagesCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
-        
-        $io->title('🖼️ Mise à jour de la qualité des images existantes');
-        $io->info('Cette commande améliore toutes les images vers le format t_cover_big (264x374px)');
 
-        // 📋 Récupère tous les jeux avec une coverUrl valide
+        $io->title('🖼️ Mise à jour des images existantes');
+        $io->text('🎯 Amélioration de la qualité des images pour tous les jeux');
+
+        // Récupère tous les jeux avec une coverUrl
         $games = $this->gameRepository->createQueryBuilder('g')
             ->where('g.coverUrl IS NOT NULL')
             ->andWhere('g.coverUrl != :empty')
@@ -94,15 +94,15 @@ class UpdateExistingImagesCommand extends Command
             ->getResult();
 
         $totalGames = count($games);
-        $updatedCount = 0;
+        $io->text("📊 {$totalGames} jeux trouvés avec des images");
 
         if ($totalGames === 0) {
-            $io->success('Aucun jeu avec image trouvé.');
+            $io->warning('Aucun jeu avec image trouvé !');
             return Command::SUCCESS;
         }
 
-        $io->text("📊 Traitement de {$totalGames} jeux...");
         $io->progressStart($totalGames);
+        $updatedCount = 0;
 
         foreach ($games as $game) {
             $originalUrl = $game->getCoverUrl();
