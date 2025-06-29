@@ -82,7 +82,9 @@ class GameImporter
                 // Mise à jour des champs modifiables
                 if (isset($apiGame['name'])) {
                     $existingGame->setTitle($apiGame['name']);
-                    $existingGame->setSlug($this->slugify->slugify($apiGame['name']));
+                    $baseSlug = $this->slugify->slugify($apiGame['name']);
+                    $uniqueSlug = $baseSlug . '-' . $igdbId;
+                    $existingGame->setSlug($uniqueSlug);
                 }
                 $existingGame->setSummary($apiGame['summary'] ?? $existingGame->getSummary());
                 
@@ -140,7 +142,9 @@ class GameImporter
             $game->setIgdbId($igdbId);
             $title = $apiGame['name'] ?? 'Inconnu';
             $game->setTitle($title);
-            $game->setSlug($this->slugify->slugify($title));
+            $baseSlug = $this->slugify->slugify($title);
+            $uniqueSlug = $baseSlug . '-' . $igdbId;
+            $game->setSlug($uniqueSlug);
             $game->setSummary($apiGame['summary'] ?? null);
             
             // Améliore la qualité de l'image si disponible
@@ -231,7 +235,9 @@ class GameImporter
                 // Mise à jour des champs modifiables
                 if (isset($apiGame['name'])) {
                     $existingGame->setTitle($apiGame['name']);
-                    $existingGame->setSlug($this->slugify->slugify($apiGame['name']));
+                    $baseSlug = $this->slugify->slugify($apiGame['name']);
+                    $uniqueSlug = $baseSlug . '-' . $igdbId;
+                    $existingGame->setSlug($uniqueSlug);
                 }
                 $existingGame->setSummary($apiGame['summary'] ?? $existingGame->getSummary());
                 
@@ -295,7 +301,9 @@ class GameImporter
             $game->setIgdbId($igdbId);
             $title = $apiGame['name'] ?? 'Inconnu';
             $game->setTitle($title);
-            $game->setSlug($this->slugify->slugify($title));
+            $baseSlug = $this->slugify->slugify($title);
+            $uniqueSlug = $baseSlug . '-' . $igdbId;
+            $game->setSlug($uniqueSlug);
             $game->setSummary($apiGame['summary'] ?? null);
             
             // Améliore la qualité de l'image si disponible
@@ -392,7 +400,9 @@ class GameImporter
         // Met à jour les informations du jeu
         $title = $apiGame['name'] ?? 'Inconnu';
         $game->setTitle($title);
-        $game->setSlug($this->slugify->slugify($title));
+        $baseSlug = $this->slugify->slugify($title);
+        $uniqueSlug = $baseSlug . '-' . $igdbId;
+        $game->setSlug($uniqueSlug);
 
         if (isset($apiGame['cover']['url'])) {
             $imageUrl = $apiGame['cover']['url'];
@@ -471,11 +481,17 @@ class GameImporter
     public function importGamesBySearch(string $query): array
     {
         // Recherche des jeux via IGDB
-        $apiGames = $this->igdbClient->searchGames($query);
+        try {
+            $apiGames = $this->igdbClient->searchGames($query);
+        } catch (\Exception $e) {
+            throw $e;
+        }
+        
         $importedGames = [];
 
-        foreach ($apiGames as $apiGame) {
+        foreach ($apiGames as $index => $apiGame) {
             $igdbId = $apiGame['id'];
+            $title = $apiGame['name'] ?? 'Inconnu';
 
             // Vérifie si le jeu existe déjà
             $game = $this->gameRepository->findOneBy(['igdbId' => $igdbId]);
@@ -483,12 +499,15 @@ class GameImporter
                 $game = new Game();
                 $game->setIgdbId($igdbId);
                 $game->setCreatedAt(new \DateTimeImmutable());
+            } else {
+                // Mise à jour jeu existant: '$title'
             }
 
             // Met à jour les informations du jeu
-            $title = $apiGame['name'] ?? 'Inconnu';
             $game->setTitle($title);
-            $game->setSlug($this->slugify->slugify($title));
+            $baseSlug = $this->slugify->slugify($title);
+            $uniqueSlug = $baseSlug . '-' . $igdbId;
+            $game->setSlug($uniqueSlug);
             
             $game->setSummary($apiGame['summary'] ?? null);
             if (array_key_exists('total_rating', $apiGame)) {
@@ -541,7 +560,6 @@ class GameImporter
                     }
                 } catch (\Exception $e) {
                     // Log l'erreur mais continue
-                    error_log("Impossible de récupérer les détails du jeu {$igdbId}: " . $e->getMessage());
                 }
             }
 
@@ -577,7 +595,6 @@ class GameImporter
                     }
                 } catch (\Exception $e) {
                     // Log l'erreur mais continue
-                    error_log("Impossible de récupérer les screenshots du jeu {$igdbId}: " . $e->getMessage());
                 }
             }
 
@@ -598,7 +615,12 @@ class GameImporter
             $importedGames[] = $game;
         }
 
-        $this->entityManager->flush();
+        try {
+            $this->entityManager->flush();
+        } catch (\Exception $e) {
+            throw $e;
+        }
+        
         return $importedGames;
     }
 

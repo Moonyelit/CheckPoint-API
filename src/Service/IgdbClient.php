@@ -115,24 +115,46 @@ class IgdbClient
      */
     public function searchGames(string $search, int $limit = 20, int $offset = 0): array
     {
-        $accessToken = $this->getAccessToken();
+        error_log("🔍 Début searchGames IGDB pour: '$search' (limit: $limit, offset: $offset)");
+        
+        try {
+            $accessToken = $this->getAccessToken();
+            error_log("🔑 Token d'accès IGDB récupéré avec succès");
+        } catch (\Exception $e) {
+            error_log("❌ Erreur lors de la récupération du token IGDB: " . $e->getMessage());
+            throw $e;
+        }
 
-        // Effectue une requête POST pour rechercher des jeux
-        $response = $this->client->request('POST', 'https://api.igdb.com/v4/games', [
-            'headers' => [
-                'Client-ID' => $this->clientId,
-                'Authorization' => 'Bearer ' . $accessToken,
-                'Content-Type' => 'text/plain',
-            ],
-            'body' => <<<EOT
-                fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots, total_rating, total_rating_count, follows, involved_companies.company.name, category;
-                search "$search";
-                limit $limit;
-                offset $offset;
-            EOT
-        ]);
+        $requestBody = <<<EOT
+            fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots, total_rating, total_rating_count, follows, involved_companies.company.name, category;
+            search "$search";
+            limit $limit;
+            offset $offset;
+        EOT;
+        
+        error_log("📤 Requête IGDB envoyée: " . str_replace("\n", " ", $requestBody));
 
-        $games = $response->toArray();
+        try {
+            // Effectue une requête POST pour rechercher des jeux
+            $response = $this->client->request('POST', 'https://api.igdb.com/v4/games', [
+                'headers' => [
+                    'Client-ID' => $this->clientId,
+                    'Authorization' => 'Bearer ' . $accessToken,
+                    'Content-Type' => 'text/plain',
+                ],
+                'body' => $requestBody
+            ]);
+
+            error_log("📡 Réponse IGDB reçue, statut: " . $response->getStatusCode());
+            
+            $games = $response->toArray();
+            error_log("📊 Réponse IGDB parsée: " . count($games) . " jeux trouvés");
+            
+        } catch (\Exception $e) {
+            error_log("❌ Erreur lors de la requête IGDB pour '$search': " . $e->getMessage());
+            error_log("❌ Détails de l'erreur: " . $e->getTraceAsString());
+            throw $e;
+        }
         
         // Améliore la qualité des images de couverture
         foreach ($games as &$game) {
@@ -146,6 +168,7 @@ class IgdbClient
             }
         }
 
+        error_log("✅ searchGames IGDB terminé pour '$search': " . count($games) . " jeux retournés");
         // Retourne les résultats sous forme de tableau
         return $games;
     }

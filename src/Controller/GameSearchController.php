@@ -73,14 +73,34 @@ class GameSearchController extends AbstractController
         if (!$cachedGames->isHit()) {
             // 🔍 ÉTAPE 1 : Recherche locale dans la base de données
             $games = $gameRepository->findByTitleLike($query);
+            
+            // Log pour debug
+            error_log("🔍 Recherche locale pour '$query': " . count($games) . " résultats trouvés");
 
             // 📥 ÉTAPE 2 : Si résultats insuffisants, complète avec import IGDB
             if (count($games) === 0) {
+                error_log("📥 Aucun résultat local, tentative d'import IGDB pour '$query'");
+                
                 try {
                     $importedGames = $gameImporter->importGamesBySearch($query);
+                    error_log("✅ Import IGDB réussi pour '$query': " . count($importedGames) . " jeux importés");
                     $games = array_merge($games, $importedGames);
                 } catch (\Throwable $e) {
-                    $this->addFlash('error', 'Erreur lors de la récupération des jeux IGDB.');
+                    error_log("❌ Erreur lors de l'import IGDB pour '$query': " . $e->getMessage());
+                    error_log("❌ Stack trace: " . $e->getTraceAsString());
+                    $this->addFlash('error', 'Erreur lors de la récupération des jeux IGDB: ' . $e->getMessage());
+                }
+            } else {
+                error_log("✅ Résultats locaux suffisants pour '$query', pas d'import IGDB nécessaire");
+                
+                // TEMPORAIRE: Forcer l'import IGDB même avec des résultats locaux pour tester
+                error_log("🧪 TEST: Import IGDB forcé même avec des résultats locaux");
+                try {
+                    $importedGames = $gameImporter->importGamesBySearch($query);
+                    error_log("✅ Import IGDB forcé réussi pour '$query': " . count($importedGames) . " jeux importés");
+                    $games = array_merge($games, $importedGames);
+                } catch (\Throwable $e) {
+                    error_log("❌ Erreur lors de l'import IGDB forcé pour '$query': " . $e->getMessage());
                 }
             }
 
@@ -88,12 +108,54 @@ class GameSearchController extends AbstractController
             $cachedGames->set($games);
             $cachedGames->expiresAfter(3600); // 1h
             $cache->save($cachedGames);
+            error_log("💾 Cache mis à jour pour '$query' avec " . count($games) . " jeux");
         } else {
             // ⚡ Récupération depuis le cache (performance optimale)
             $games = $cachedGames->get();
+            error_log("⚡ Résultats récupérés depuis le cache pour '$query': " . count($games) . " jeux");
         }
 
         // 🎨 Affichage des résultats avec vue Twig
+        return $this->render('games/search.html.twig', [
+            'games' => $games,
+            'query' => $query,
+        ]);
+    }
+
+    /**
+     * Route de test pour forcer une recherche IGDB en vidant le cache
+     */
+    #[Route('/games/search-test/{query}', name: 'games_search_test')]
+    public function searchTest(
+        string $query,
+        GameRepository $gameRepository,
+        GameImporter $gameImporter
+    ): Response {
+        error_log("🧪 ROUTE DE TEST - Recherche forcée pour '$query'");
+        
+        $cache = new FilesystemAdapter();
+        $cacheKey = 'search_' . md5($query);
+        
+        // Force la suppression du cache
+        $cache->deleteItem($cacheKey);
+        error_log("🗑️ Cache supprimé pour '$query'");
+        
+        // Recherche locale
+        $games = $gameRepository->findByTitleLike($query);
+        error_log("🔍 Recherche locale pour '$query': " . count($games) . " résultats trouvés");
+        
+        // Force l'import IGDB même si des résultats locaux existent
+        try {
+            error_log("📥 Import IGDB forcé pour '$query'");
+            $importedGames = $gameImporter->importGamesBySearch($query);
+            error_log("✅ Import IGDB réussi pour '$query': " . count($importedGames) . " jeux importés");
+            $games = array_merge($games, $importedGames);
+        } catch (\Throwable $e) {
+            error_log("❌ Erreur lors de l'import IGDB pour '$query': " . $e->getMessage());
+            error_log("❌ Stack trace: " . $e->getTraceAsString());
+            $this->addFlash('error', 'Erreur lors de la récupération des jeux IGDB: ' . $e->getMessage());
+        }
+        
         return $this->render('games/search.html.twig', [
             'games' => $games,
             'query' => $query,
