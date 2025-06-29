@@ -135,6 +135,12 @@ class DebugImagesCommand extends Command
 
         foreach ($popularGames as $game) {
             $originalUrl = $game->getCoverUrl();
+            
+            // Corriger l'URL si nécessaire
+            if ($originalUrl && strpos($originalUrl, '//') === 0) {
+                $originalUrl = 'https:' . $originalUrl;
+            }
+            
             $improvedUrl = $this->igdbClient->improveImageQuality($originalUrl, 't_cover_big');
             
             $io->text("🎮 {$game->getTitle()}");

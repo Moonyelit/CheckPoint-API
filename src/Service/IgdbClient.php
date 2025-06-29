@@ -137,7 +137,12 @@ class IgdbClient
         // Améliore la qualité des images de couverture
         foreach ($games as &$game) {
             if (isset($game['cover']['url'])) {
-                $game['cover']['url'] = $this->improveImageQuality($game['cover']['url'], 't_cover_big');
+                // S'assurer que l'URL a le bon format
+                $imageUrl = $game['cover']['url'];
+                if (strpos($imageUrl, '//') === 0) {
+                    $imageUrl = 'https:' . $imageUrl;
+                }
+                $game['cover']['url'] = $this->improveImageQuality($imageUrl, 't_cover_big');
             }
         }
 
@@ -181,7 +186,11 @@ class IgdbClient
         // Améliore la qualité des captures d'écran
         foreach ($screenshots as &$screenshot) {
             if (isset($screenshot['url'])) {
-                $screenshot['url'] = $this->improveImageQuality($screenshot['url'], 't_1080p');
+                $imageUrl = $screenshot['url'];
+                if (strpos($imageUrl, '//') === 0) {
+                    $imageUrl = 'https:' . $imageUrl;
+                }
+                $screenshot['url'] = $this->improveImageQuality($imageUrl, 't_1080p');
             }
         }
 
@@ -222,7 +231,12 @@ class IgdbClient
         // Améliore la qualité des images de couverture
         foreach ($games as &$game) {
             if (isset($game['cover']['url'])) {
-                $game['cover']['url'] = $this->improveImageQuality($game['cover']['url'], 't_cover_big');
+                // S'assurer que l'URL a le bon format
+                $imageUrl = $game['cover']['url'];
+                if (strpos($imageUrl, '//') === 0) {
+                    $imageUrl = 'https:' . $imageUrl;
+                }
+                $game['cover']['url'] = $this->improveImageQuality($imageUrl, 't_cover_big');
             }
         }
 
@@ -268,7 +282,12 @@ class IgdbClient
         // Améliore la qualité des images de couverture
         foreach ($games as &$game) {
             if (isset($game['cover']['url'])) {
-                $game['cover']['url'] = $this->improveImageQuality($game['cover']['url'], 't_cover_big');
+                // S'assurer que l'URL a le bon format
+                $imageUrl = $game['cover']['url'];
+                if (strpos($imageUrl, '//') === 0) {
+                    $imageUrl = 'https:' . $imageUrl;
+                }
+                $game['cover']['url'] = $this->improveImageQuality($imageUrl, 't_cover_big');
             }
         }
 
@@ -280,7 +299,7 @@ class IgdbClient
      *
      * Cette méthode récupère les jeux récents les mieux notés :
      * - Jeux sortis dans les 365 derniers jours
-     * - Note minimum 75/100 et au moins 10 votes
+     * - Note minimum 80/100 et au moins 80 votes
      * - Triés par note décroissante
      *
      * @return array La liste des jeux de l'année.
@@ -303,7 +322,7 @@ class IgdbClient
             'body' => <<<EOT
             fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots, total_rating, total_rating_count, involved_companies.company.name;
             sort total_rating desc;
-            where first_release_date >= $oneYearAgo & first_release_date <= $now & total_rating >= 75 & total_rating_count >= 10;
+            where first_release_date >= $oneYearAgo & first_release_date <= $now & total_rating >= 80 & total_rating_count >= 80;
             limit 50;
             EOT
         ]);
@@ -313,7 +332,11 @@ class IgdbClient
         // Améliore la qualité des images de couverture
         foreach ($games as &$game) {
             if (isset($game['cover']['url'])) {
-                $game['cover']['url'] = $this->improveImageQuality($game['cover']['url'], 't_cover_big');
+                $imageUrl = $game['cover']['url'];
+                if (strpos($imageUrl, '//') === 0) {
+                    $imageUrl = 'https:' . $imageUrl;
+                }
+                $game['cover']['url'] = $this->improveImageQuality($imageUrl, 't_cover_big');
             }
         }
 
@@ -358,7 +381,12 @@ class IgdbClient
             
             // Améliore la qualité de l'image de couverture
             if (isset($game['cover']['url'])) {
-                $game['cover']['url'] = $this->improveImageQuality($game['cover']['url'], 't_cover_big');
+                // S'assurer que l'URL a le bon format
+                $imageUrl = $game['cover']['url'];
+                if (strpos($imageUrl, '//') === 0) {
+                    $imageUrl = 'https:' . $imageUrl;
+                }
+                $game['cover']['url'] = $this->improveImageQuality($imageUrl, 't_cover_big');
             }
 
             return $game;
@@ -377,6 +405,13 @@ class IgdbClient
      */
     public function improveImageQuality(string $url, string $size = 't_1080p'): string
     {
+        // S'assurer que l'URL a le bon format
+        if (strpos($url, '//') === 0) {
+            $url = 'https:' . $url;
+        } elseif (!preg_match('/^https?:\/\//', $url)) {
+            $url = 'https://' . $url;
+        }
+
         // Vérifie si l'URL contient déjà la taille demandée pour éviter les doublons
         if (strpos($url, $size) !== false) {
             return $url;

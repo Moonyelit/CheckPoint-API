@@ -284,7 +284,21 @@ class Game
 
     public function getCoverUrl(): ?string
     {
-        return $this->coverUrl;
+        if (!$this->coverUrl) {
+            return null;
+        }
+        
+        // Décoder l'URL si elle est encodée
+        $decodedUrl = urldecode($this->coverUrl);
+        
+        // S'assurer que l'URL a le bon format
+        if (strpos($decodedUrl, '//') === 0) {
+            $decodedUrl = 'https:' . $decodedUrl;
+        } elseif (!preg_match('/^https?:\/\//', $decodedUrl)) {
+            $decodedUrl = 'https://' . $decodedUrl;
+        }
+        
+        return $decodedUrl;
     }
 
     public function setCoverUrl(?string $coverUrl): static
@@ -442,6 +456,22 @@ class Game
         }
         
         $firstScreenshot = $screenshots->first();
-        return $firstScreenshot->getImage();
+        $imageUrl = $firstScreenshot->getImage();
+        
+        if (!$imageUrl) {
+            return null;
+        }
+        
+        // Décoder l'URL si elle est encodée
+        $decodedUrl = urldecode($imageUrl);
+        
+        // S'assurer que l'URL a le bon format
+        if (strpos($decodedUrl, '//') === 0) {
+            $decodedUrl = 'https:' . $decodedUrl;
+        } elseif (!preg_match('/^https?:\/\//', $decodedUrl)) {
+            $decodedUrl = 'https://' . $decodedUrl;
+        }
+        
+        return $decodedUrl;
     }
 }

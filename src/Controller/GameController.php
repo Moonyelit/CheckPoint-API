@@ -281,7 +281,15 @@ class GameController extends AbstractController
         // Améliore automatiquement la qualité des images pour chaque jeu
         foreach ($games as $game) {
             if ($game->getCoverUrl()) {
-                $improvedUrl = $igdbClient->improveImageQuality($game->getCoverUrl(), 't_cover_big');
+                // S'assurer que l'URL a le bon format
+                $coverUrl = $game->getCoverUrl();
+                if (strpos($coverUrl, '//') === 0) {
+                    $coverUrl = 'https:' . $coverUrl;
+                } elseif (!preg_match('/^https?:\/\//', $coverUrl)) {
+                    $coverUrl = 'https://' . $coverUrl;
+                }
+                
+                $improvedUrl = $igdbClient->improveImageQuality($coverUrl, 't_cover_big');
                 $game->setCoverUrl($improvedUrl);
             }
         }
@@ -294,13 +302,21 @@ class GameController extends AbstractController
     {
         $limit = (int) $request->query->get('limit', 5);
         
-        // Récupère les jeux de l'année (365 derniers jours)
-        $games = $gameRepository->findTopYearGames($limit);
+        // Récupère les jeux de l'année (365 derniers jours) avec critères stricts
+        $games = $gameRepository->findTopYearGamesWithCriteria($limit, 80, 80);
         
         // Améliore automatiquement la qualité des images pour chaque jeu
         foreach ($games as $game) {
             if ($game->getCoverUrl()) {
-                $improvedUrl = $igdbClient->improveImageQuality($game->getCoverUrl(), 't_cover_big');
+                // S'assurer que l'URL a le bon format
+                $coverUrl = $game->getCoverUrl();
+                if (strpos($coverUrl, '//') === 0) {
+                    $coverUrl = 'https:' . $coverUrl;
+                } elseif (!preg_match('/^https?:\/\//', $coverUrl)) {
+                    $coverUrl = 'https://' . $coverUrl;
+                }
+                
+                $improvedUrl = $igdbClient->improveImageQuality($coverUrl, 't_cover_big');
                 $game->setCoverUrl($improvedUrl);
             }
         }

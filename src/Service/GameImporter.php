@@ -88,7 +88,11 @@ class GameImporter
                 
                 // Améliore la qualité de l'image si disponible
                 if (isset($apiGame['cover']['url'])) {
-                    $highQualityUrl = $this->igdbClient->improveImageQuality('https:' . $apiGame['cover']['url'], 't_cover_big');
+                    $imageUrl = $apiGame['cover']['url'];
+                    if (strpos($imageUrl, '//') === 0) {
+                        $imageUrl = 'https:' . $imageUrl;
+                    }
+                    $highQualityUrl = $this->igdbClient->improveImageQuality($imageUrl, 't_cover_big');
                     $existingGame->setCoverUrl($highQualityUrl);
                 }
                 
@@ -134,7 +138,11 @@ class GameImporter
             
             // Améliore la qualité de l'image si disponible
             if (isset($apiGame['cover']['url'])) {
-                $highQualityUrl = $this->igdbClient->improveImageQuality('https:' . $apiGame['cover']['url'], 't_cover_big');
+                $imageUrl = $apiGame['cover']['url'];
+                if (strpos($imageUrl, '//') === 0) {
+                    $imageUrl = 'https:' . $imageUrl;
+                }
+                $highQualityUrl = $this->igdbClient->improveImageQuality($imageUrl, 't_cover_big');
                 $game->setCoverUrl($highQualityUrl);
             }
             
@@ -168,7 +176,11 @@ class GameImporter
                 $screenshotData = $this->igdbClient->getScreenshots($apiGame['screenshots']);
                 foreach ($screenshotData as $data) {
                     $screenshot = new Screenshot();
-                    $screenshot->setImage('https:' . $data['url']);
+                    $imageUrl = $data['url'];
+                    if (strpos($imageUrl, '//') === 0) {
+                        $imageUrl = 'https:' . $imageUrl;
+                    }
+                    $screenshot->setImage($imageUrl);
                     $screenshot->setGame($game);
                     $game->addScreenshot($screenshot);
                 }
@@ -209,7 +221,11 @@ class GameImporter
                 
                 // Améliore la qualité de l'image si disponible
                 if (isset($apiGame['cover']['url'])) {
-                    $highQualityUrl = $this->igdbClient->improveImageQuality('https:' . $apiGame['cover']['url'], 't_cover_big');
+                    $imageUrl = $apiGame['cover']['url'];
+                    if (strpos($imageUrl, '//') === 0) {
+                        $imageUrl = 'https:' . $imageUrl;
+                    }
+                    $highQualityUrl = $this->igdbClient->improveImageQuality($imageUrl, 't_cover_big');
                     $existingGame->setCoverUrl($highQualityUrl);
                 }
                 
@@ -258,7 +274,11 @@ class GameImporter
             
             // Améliore la qualité de l'image si disponible
             if (isset($apiGame['cover']['url'])) {
-                $highQualityUrl = $this->igdbClient->improveImageQuality('https:' . $apiGame['cover']['url'], 't_cover_big');
+                $imageUrl = $apiGame['cover']['url'];
+                if (strpos($imageUrl, '//') === 0) {
+                    $imageUrl = 'https:' . $imageUrl;
+                }
+                $highQualityUrl = $this->igdbClient->improveImageQuality($imageUrl, 't_cover_big');
                 $game->setCoverUrl($highQualityUrl);
             }
             
@@ -297,7 +317,11 @@ class GameImporter
                 $screenshotData = $this->igdbClient->getScreenshots($apiGame['screenshots']);
                 foreach ($screenshotData as $data) {
                     $screenshot = new Screenshot();
-                    $screenshot->setImage('https:' . $data['url']);
+                    $imageUrl = $data['url'];
+                    if (strpos($imageUrl, '//') === 0) {
+                        $imageUrl = 'https:' . $imageUrl;
+                    }
+                    $screenshot->setImage($imageUrl);
                     $screenshot->setGame($game);
                     $game->addScreenshot($screenshot);
                 }
@@ -336,7 +360,11 @@ class GameImporter
         $game->setSlug($this->slugify->slugify($title));
 
         if (isset($apiGame['cover']['url'])) {
-            $highQualityUrl = $this->igdbClient->improveImageQuality('https:' . $apiGame['cover']['url'], 't_cover_big');
+            $imageUrl = $apiGame['cover']['url'];
+            if (strpos($imageUrl, '//') === 0) {
+                $imageUrl = 'https:' . $imageUrl;
+            }
+            $highQualityUrl = $this->igdbClient->improveImageQuality($imageUrl, 't_cover_big');
             $game->setCoverUrl($highQualityUrl);
         }
         
@@ -371,7 +399,11 @@ class GameImporter
             $screenshotData = $this->igdbClient->getScreenshots($apiGame['screenshots']);
             foreach ($screenshotData as $data) {
                 $screenshot = new Screenshot();
-                $screenshot->setImage('https:' . $data['url']);
+                $imageUrl = $data['url'];
+                if (strpos($imageUrl, '//') === 0) {
+                    $imageUrl = 'https:' . $imageUrl;
+                }
+                $screenshot->setImage($imageUrl);
                 $screenshot->setGame($game);
                 $game->addScreenshot($screenshot);
             }
@@ -436,14 +468,22 @@ class GameImporter
 
             // Gestion améliorée de l'image de couverture
             if (isset($apiGame['cover']['url'])) {
-                $highQualityUrl = $this->igdbClient->improveImageQuality('https:' . $apiGame['cover']['url'], 't_cover_big');
+                $imageUrl = $apiGame['cover']['url'];
+                if (strpos($imageUrl, '//') === 0) {
+                    $imageUrl = 'https:' . $imageUrl;
+                }
+                $highQualityUrl = $this->igdbClient->improveImageQuality($imageUrl, 't_cover_big');
                 $game->setCoverUrl($highQualityUrl);
             } else {
                 // Si pas de couverture, essayer de récupérer depuis IGDB avec l'ID
                 try {
                     $detailedGame = $this->igdbClient->getGameDetails($igdbId);
                     if (isset($detailedGame['cover']['url'])) {
-                        $highQualityUrl = $this->igdbClient->improveImageQuality('https:' . $detailedGame['cover']['url'], 't_cover_big');
+                        $imageUrl = $detailedGame['cover']['url'];
+                        if (strpos($imageUrl, '//') === 0) {
+                            $imageUrl = 'https:' . $imageUrl;
+                        }
+                        $highQualityUrl = $this->igdbClient->improveImageQuality($imageUrl, 't_cover_big');
                         $game->setCoverUrl($highQualityUrl);
                     }
                 } catch (\Exception $e) {
@@ -457,7 +497,11 @@ class GameImporter
                 $screenshotData = $this->igdbClient->getScreenshots($apiGame['screenshots']);
                 foreach ($screenshotData as $data) {
                     $screenshot = new Screenshot();
-                    $screenshot->setImage('https:' . $data['url']);
+                    $imageUrl = $data['url'];
+                    if (strpos($imageUrl, '//') === 0) {
+                        $imageUrl = 'https:' . $imageUrl;
+                    }
+                    $screenshot->setImage($imageUrl);
                     $screenshot->setGame($game);
                     $game->addScreenshot($screenshot);
                 }
@@ -469,7 +513,11 @@ class GameImporter
                         $screenshotData = $this->igdbClient->getScreenshots($detailedGame['screenshots']);
                         foreach ($screenshotData as $data) {
                             $screenshot = new Screenshot();
-                            $screenshot->setImage('https:' . $data['url']);
+                            $imageUrl = $data['url'];
+                            if (strpos($imageUrl, '//') === 0) {
+                                $imageUrl = 'https:' . $imageUrl;
+                            }
+                            $screenshot->setImage($imageUrl);
                             $screenshot->setGame($game);
                             $game->addScreenshot($screenshot);
                         }
@@ -514,7 +562,11 @@ class GameImporter
             $game->setSlug($this->slugify->slugify($title));
 
             if (isset($apiGame['cover']['url'])) {
-                $highQualityUrl = $this->igdbClient->improveImageQuality('https:' . $apiGame['cover']['url'], 't_cover_big');
+                $imageUrl = $apiGame['cover']['url'];
+                if (strpos($imageUrl, '//') === 0) {
+                    $imageUrl = 'https:' . $imageUrl;
+                }
+                $highQualityUrl = $this->igdbClient->improveImageQuality($imageUrl, 't_cover_big');
                 $game->setCoverUrl($highQualityUrl);
             }
 
@@ -550,7 +602,11 @@ class GameImporter
                 $screenshotData = $this->igdbClient->getScreenshots($apiGame['screenshots']);
                 foreach ($screenshotData as $data) {
                     $screenshot = new Screenshot();
-                    $screenshot->setImage('https:' . $data['url']);
+                    $imageUrl = $data['url'];
+                    if (strpos($imageUrl, '//') === 0) {
+                        $imageUrl = 'https:' . $imageUrl;
+                    }
+                    $screenshot->setImage($imageUrl);
                     $screenshot->setGame($game);
                     $game->addScreenshot($screenshot);
                 }

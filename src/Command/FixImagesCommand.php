@@ -120,9 +120,27 @@ class FixImagesCommand extends Command
             try {
                 // ✅ VALIDATION : Vérification format URL
                 if (!filter_var($originalUrl, FILTER_VALIDATE_URL)) {
-                    $io->error("❌ URL invalide pour $title : $originalUrl");
-                    $errorCount++;
-                    continue;
+                    // Essayer de corriger l'URL mal formatée
+                    $correctedUrl = $originalUrl;
+                    
+                    // Décoder l'URL si elle est encodée
+                    $correctedUrl = urldecode($correctedUrl);
+                    
+                    if (strpos($correctedUrl, '//') === 0) {
+                        $correctedUrl = 'https:' . $correctedUrl;
+                    } elseif (!preg_match('/^https?:\/\//', $correctedUrl)) {
+                        $correctedUrl = 'https://' . $correctedUrl;
+                    }
+                    
+                    if (filter_var($correctedUrl, FILTER_VALIDATE_URL)) {
+                        $originalUrl = $correctedUrl;
+                        $game->setCoverUrl($correctedUrl);
+                        $io->text("🔧 URL corrigée pour $title : $correctedUrl");
+                    } else {
+                        $io->error("❌ URL invalide pour $title : $originalUrl");
+                        $errorCount++;
+                        continue;
+                    }
                 }
 
                 // ✨ AMÉLIORATION : Optimisation qualité image

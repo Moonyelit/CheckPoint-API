@@ -29,104 +29,68 @@ class FixMissingDataCommand extends Command
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         $io = new SymfonyStyle($input, $output);
+        $io->title('🔧 Correction des données manquantes');
 
-        $io->title('🔧 Correction des données manquantes pour les jeux existants');
+        $gameRepository = $this->entityManager->getRepository(Game::class);
+        $games = $gameRepository->findAll();
 
-        // Récupère tous les jeux qui ont un igdbId mais qui manquent de coverUrl ou de screenshots
-        $gamesToFix = $this->gameRepository->createQueryBuilder('g')
-            ->leftJoin('g.screenshots', 's')
-            ->where('g.igdbId IS NOT NULL')
-            ->andWhere('(g.coverUrl IS NULL OR g.coverUrl = :empty OR s.id IS NULL)')
-            ->setParameter('empty', '')
-            ->getQuery()
-            ->getResult();
+        $io->text(sprintf('📊 Analyse de %d jeux...', count($games)));
 
-        if (empty($gamesToFix)) {
-            $io->success('Tous les jeux ont déjà des données complètes !');
-            return Command::SUCCESS;
-        }
-
-        $io->info(sprintf('Trouvé %d jeux avec des données manquantes', count($gamesToFix)));
-
-        $fixedCount = 0;
+        $updatedCount = 0;
         $errorCount = 0;
 
-        foreach ($gamesToFix as $game) {
-            try {
-                $io->text(sprintf('Traitement de "%s" (IGDB ID: %d)...', $game->getTitle(), $game->getIgdbId()));
+        foreach ($games as $game) {
+            $io->text(sprintf('🎮 Traitement de : %s', $game->getTitle()));
+            
+            $hasChanges = false;
 
-                // Récupère les détails complets du jeu depuis IGDB
+            try {
+                // Récupère les détails du jeu depuis IGDB
                 $detailedGame = $this->igdbClient->getGameDetails($game->getIgdbId());
                 
-                if (!$detailedGame) {
-                    $io->warning(sprintf('Aucune donnée IGDB trouvée pour "%s"', $game->getTitle()));
-                    continue;
-                }
-
-                $hasChanges = false;
-
-                // Corrige l'image de couverture si manquante
-                if ((!$game->getCoverUrl() || $game->getCoverUrl() === '') && isset($detailedGame['cover']['url'])) {
-                    $highQualityUrl = $this->igdbClient->improveImageQuality('https:' . $detailedGame['cover']['url'], 't_cover_big');
-                    $game->setCoverUrl($highQualityUrl);
-                    $hasChanges = true;
-                    $io->text('  ✅ Couverture ajoutée');
-                }
-
-                // Corrige les screenshots si manquants
-                $screenshots = $game->getScreenshots();
-                if ($screenshots->count() === 0 && isset($detailedGame['screenshots']) && is_array($detailedGame['screenshots'])) {
-                    $screenshotData = $this->igdbClient->getScreenshots($detailedGame['screenshots']);
-                    
-                    foreach ($screenshotData as $data) {
-                        $screenshot = new \App\Entity\Screenshot();
-                        $screenshot->setImage('https:' . $data['url']);
-                        $screenshot->setGame($game);
-                        $game->addScreenshot($screenshot);
+                if ($detailedGame) {
+                    // Corrige la note si manquante
+                    if ((!$game->getTotalRating() || $game->getTotalRating() === 0) && isset($detailedGame['total_rating'])) {
+                        $game->setTotalRating($detailedGame['total_rating']);
+                        $hasChanges = true;
+                        $io->text('  ✅ Note ajoutée');
                     }
-                    
-                    $hasChanges = true;
-                    $io->text(sprintf('  ✅ %d screenshots ajoutés', count($screenshotData)));
+
+                    // Corrige le nombre de votes si manquant
+                    if ((!$game->getTotalRatingCount() || $game->getTotalRatingCount() === 0) && isset($detailedGame['total_rating_count'])) {
+                        $game->setTotalRatingCount($detailedGame['total_rating_count']);
+                        $hasChanges = true;
+                        $io->text('  ✅ Nombre de votes ajouté: ' . $detailedGame['total_rating_count']);
+                    }
+
+                    // Corrige l'image de couverture si manquante
+                    if ((!$game->getCoverUrl() || $game->getCoverUrl() === '') && isset($detailedGame['cover']['url'])) {
+                        $imageUrl = $detailedGame['cover']['url'];
+                        if (strpos($imageUrl, '//') === 0) {
+                            $imageUrl = 'https:' . $imageUrl;
+                        }
+                        $highQualityUrl = $this->igdbClient->improveImageQuality($imageUrl, 't_cover_big');
+                        $game->setCoverUrl($highQualityUrl);
+                        $hasChanges = true;
+                        $io->text('  ✅ Couverture ajoutée');
+                    }
+
+                    if ($hasChanges) {
+                        $game->setUpdatedAt(new \DateTimeImmutable());
+                        $this->entityManager->persist($game);
+                        $updatedCount++;
+                    }
                 }
-
-                // Met à jour d'autres champs si nécessaire
-                if (!$game->getSummary() && isset($detailedGame['summary'])) {
-                    $game->setSummary($detailedGame['summary']);
-                    $hasChanges = true;
-                    $io->text('  ✅ Résumé ajouté');
-                }
-
-                if (!$game->getTotalRating() && isset($detailedGame['total_rating'])) {
-                    $game->setTotalRating($detailedGame['total_rating']);
-                    $hasChanges = true;
-                    $io->text('  ✅ Note ajoutée');
-                }
-
-                if ($hasChanges) {
-                    $game->setUpdatedAt(new \DateTimeImmutable());
-                    $this->entityManager->persist($game);
-                    $fixedCount++;
-                } else {
-                    $io->text('  ⚠️ Aucune donnée manquante détectée');
-                }
-
-                // Pause pour éviter de surcharger l'API IGDB
-                usleep(500000); // 0.5 seconde
-
-            } catch (\Throwable $e) {
-                $io->error(sprintf('Erreur pour "%s": %s', $game->getTitle(), $e->getMessage()));
+            } catch (\Exception $e) {
+                $io->error(sprintf('❌ Erreur pour %s : %s', $game->getTitle(), $e->getMessage()));
                 $errorCount++;
             }
         }
 
-        // Sauvegarde toutes les modifications
+        // Sauvegarde en base
         $this->entityManager->flush();
 
-        $io->success([
-            "Correction terminée !",
-            "Jeux corrigés: $fixedCount",
-            "Erreurs: $errorCount"
-        ]);
+        $io->success(sprintf('✅ Correction terminée ! %d jeux mis à jour, %d erreurs', $updatedCount, $errorCount));
 
         return Command::SUCCESS;
     }

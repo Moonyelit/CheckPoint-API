@@ -88,4 +88,33 @@ class GameRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
+
+    /**
+     * Retourne les meilleurs jeux sortis dans les 365 derniers jours avec critères stricts.
+     * Filtre les jeux avec une note >= 80 et au moins 80 votes.
+     * Trie par totalRating décroissant.
+     *
+     * @param int $limit Nombre maximum de jeux à retourner
+     * @param int $minRating Note minimum (sur 100)
+     * @param int $minVotes Nombre minimum de votes
+     * @return Game[]
+     */
+    public function findTopYearGamesWithCriteria(int $limit = 5, int $minRating = 80, int $minVotes = 80): array
+    {
+        $oneYearAgo = new \DateTimeImmutable('-365 days');
+
+        return $this->createQueryBuilder('g')
+            ->andWhere('g.releaseDate >= :oneYearAgo')
+            ->andWhere('g.totalRating IS NOT NULL')
+            ->andWhere('g.totalRating >= :minRating')
+            ->andWhere('(g.totalRatingCount >= :minVotes OR g.totalRatingCount IS NULL)')
+            ->setParameter('oneYearAgo', $oneYearAgo)
+            ->setParameter('minRating', $minRating)
+            ->setParameter('minVotes', $minVotes)
+            ->orderBy('g.totalRating', 'DESC')
+            ->addOrderBy('g.totalRatingCount', 'DESC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
 }

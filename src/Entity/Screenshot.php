@@ -71,7 +71,21 @@ class Screenshot
 
     public function getImage(): ?string
     {
-        return $this->image;
+        if (!$this->image) {
+            return null;
+        }
+        
+        // Décoder l'URL si elle est encodée
+        $decodedUrl = urldecode($this->image);
+        
+        // S'assurer que l'URL a le bon format
+        if (strpos($decodedUrl, '//') === 0) {
+            $decodedUrl = 'https:' . $decodedUrl;
+        } elseif (!preg_match('/^https?:\/\//', $decodedUrl)) {
+            $decodedUrl = 'https://' . $decodedUrl;
+        }
+        
+        return $decodedUrl;
     }
 
     public function setImage(?string $image): static
