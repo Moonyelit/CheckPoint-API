@@ -592,7 +592,7 @@ class GameImporter
      * @param int|null $existingId L'ID du jeu existant (null si nouveau)
      * @return string Le slug unique
      */
-    private function generateUniqueSlug(string $baseSlug, ?int $existingId = null): string
+    public function generateUniqueSlug(string $baseSlug, ?int $existingId = null): string
     {
         $slug = $baseSlug;
         $counter = 1;
