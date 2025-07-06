@@ -562,6 +562,10 @@ class GameController extends AbstractController
         // Décoder l'URL si elle est encodée
         $imageUrl = urldecode($imageUrl);
         
+        // Nettoyer les protocoles dupliqués (https://https:// ou http://https://)
+        $imageUrl = preg_replace('/^https?:\/\/https?:\/\/?/', 'https://', $imageUrl);
+        $imageUrl = preg_replace('/^https?:\/\/http:\/\/?/', 'https://', $imageUrl);
+        
         // Vérifier si l'URL contient déjà notre proxy (récursion)
         if (strpos($imageUrl, '/api/proxy/image') !== false || 
             strpos($imageUrl, '127.0.0.1:8000/api/proxy/image') !== false ||
@@ -678,5 +682,67 @@ class GameController extends AbstractController
         
         $this->logger->warning("❌ Aucune variante n'a fonctionné pour : '{$title}'");
         return null;
+    }
+
+    #[Route('/admin/fix-malformed-urls', name: 'admin_fix_malformed_urls')]
+    public function fixMalformedUrls(GameRepository $gameRepository): Response
+    {
+        // Récupère tous les jeux avec une coverUrl
+        $games = $gameRepository->createQueryBuilder('g')
+            ->where('g.coverUrl IS NOT NULL')
+            ->andWhere('g.coverUrl != :empty')
+            ->setParameter('empty', '')
+            ->getQuery()
+            ->getResult();
+
+        $fixedCount = 0;
+        $errors = [];
+
+        foreach ($games as $game) {
+            $originalUrl = $game->getCoverUrl();
+            
+            // Vérifier si l'URL est malformée
+            if (preg_match('/^https?:\/\/https?:\/\/?/', $originalUrl) || 
+                preg_match('/^https?:\/\/http:\/\/?/', $originalUrl)) {
+                
+                // Nettoyer l'URL
+                $cleanedUrl = preg_replace('/^https?:\/\/https?:\/\/?/', 'https://', $originalUrl);
+                $cleanedUrl = preg_replace('/^https?:\/\/http:\/\/?/', 'https://', $cleanedUrl);
+                
+                // S'assurer que l'URL a le bon format
+                if (strpos($cleanedUrl, '//') === 0) {
+                    $cleanedUrl = 'https:' . $cleanedUrl;
+                } elseif (!preg_match('/^https?:\/\//', $cleanedUrl)) {
+                    $cleanedUrl = 'https://' . $cleanedUrl;
+                }
+                
+                if ($cleanedUrl !== $originalUrl) {
+                    try {
+                        $game->setCoverUrl($cleanedUrl);
+                        $game->setUpdatedAt(new \DateTimeImmutable());
+                        $fixedCount++;
+                        
+                        $this->logger->info("URL corrigée pour '{$game->getTitle()}': {$originalUrl} -> {$cleanedUrl}");
+                    } catch (\Exception $e) {
+                        $errors[] = "Erreur pour '{$game->getTitle()}': " . $e->getMessage();
+                    }
+                }
+            }
+        }
+
+        // Sauvegarder en base
+        try {
+            $gameRepository->getEntityManager()->flush();
+            $this->logger->info("Correction terminée: {$fixedCount} URLs corrigées");
+        } catch (\Exception $e) {
+            $errors[] = "Erreur lors de la sauvegarde: " . $e->getMessage();
+        }
+
+        $response = "Correction terminée ! {$fixedCount} URLs malformées corrigées.";
+        if (!empty($errors)) {
+            $response .= "\nErreurs:\n" . implode("\n", $errors);
+        }
+
+        return new Response($response);
     }
 }
