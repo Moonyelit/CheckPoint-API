@@ -132,10 +132,10 @@ class ImportTop100GamesCommand extends Command
     private function cleanGameSlugs(SymfonyStyle $io): void
     {
         $io->text('🧹 Nettoyage automatique des slugs (suppression des IDs IGDB)...');
-        
         $games = $this->gameRepository->findAll();
         $updatedCount = 0;
         $slugify = new Slugify();
+        $slugMap = [];
 
         foreach ($games as $game) {
             $oldSlug = $game->getSlug();
@@ -144,15 +144,20 @@ class ImportTop100GamesCommand extends Command
             // Vérifier si le slug contient un ID IGDB (se termine par -nombre)
             if (preg_match('/^(.+)-\d+$/', $oldSlug, $matches)) {
                 $baseSlug = $matches[1];
-                $newSlug = $this->generateUniqueSlug($baseSlug, $game->getId());
                 
+                // Générer un nouveau slug basé sur le titre original pour préserver la logique
+                $newBaseSlug = $this->generateSlugFromTitle($title);
+                $newSlug = $this->generateUniqueSlugWithMap($newBaseSlug, $game->getId(), $slugMap);
+
                 if ($newSlug !== $oldSlug) {
                     $game->setSlug($newSlug);
                     $this->entityManager->persist($game);
                     $updatedCount++;
-                    
                     $io->text(sprintf('✅ %s : %s → %s', $title, $oldSlug, $newSlug));
                 }
+            } else {
+                // Marquer les slugs déjà propres dans la map
+                $slugMap[$oldSlug] = $game->getId();
             }
         }
 
@@ -165,34 +170,37 @@ class ImportTop100GamesCommand extends Command
     }
 
     /**
-     * Génère un slug unique sans inclure l'ID IGDB
+     * Génère un slug basé sur le titre original pour préserver la logique
      */
-    private function generateUniqueSlug(string $baseSlug, ?int $existingId = null): string
+    private function generateSlugFromTitle(string $title): string
+    {
+        $slugify = new Slugify();
+        return $slugify->slugify($title);
+    }
+
+    /**
+     * Génère un slug unique sans inclure l'ID IGDB en utilisant une map des slugs existants
+     */
+    private function generateUniqueSlugWithMap(string $baseSlug, ?int $existingId, array &$slugMap): string
     {
         $slug = $baseSlug;
-        $counter = 1;
-        
-        // Vérifier si le slug existe déjà (sauf pour le jeu actuel)
+        $counter = 2;
+        // Vérifier si le slug existe déjà dans notre map ou en base
         while (true) {
             $existingGame = $this->gameRepository->findOneBy(['slug' => $slug]);
-            
+            $inMap = isset($slugMap[$slug]);
             // Si aucun jeu avec ce slug, ou si c'est le même jeu (mise à jour)
-            if (!$existingGame || ($existingId && $existingGame->getId() === $existingId)) {
+            if ((!$existingGame && !$inMap) || ($existingId && $existingGame && $existingGame->getId() === $existingId)) {
                 break;
             }
-            
-            // Sinon, ajouter un suffixe numérique
             $slug = $baseSlug . '-' . $counter;
             $counter++;
-            
-            // Éviter les boucles infinies
             if ($counter > 100) {
-                // Si on a trop de tentatives, ajouter un timestamp pour garantir l'unicité
                 $slug = $baseSlug . '-' . time();
                 break;
             }
         }
-        
+        $slugMap[$slug] = $existingId ?? true;
         return $slug;
     }
 } 

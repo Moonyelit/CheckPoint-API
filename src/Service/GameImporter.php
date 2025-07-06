@@ -168,6 +168,7 @@ class GameImporter
     {
         $games = $this->igdbClient->getTop100Games($minVotes, $minRating);
         $count = 0;
+        $slugMap = [];
 
         foreach ($games as $apiGame) {
             $igdbId = $apiGame['id'];
@@ -187,7 +188,7 @@ class GameImporter
             $game->setTitle($title);
             $baseSlug = $this->slugify->slugify($title);
             // Générer un slug unique sans l'ID IGDB
-            $uniqueSlug = $this->generateUniqueSlug($baseSlug, $game->getId());
+            $uniqueSlug = $this->generateUniqueSlug($baseSlug, $game->getId(), $slugMap);
             $game->setSlug($uniqueSlug);
 
             if (isset($apiGame['summary'])) {
@@ -587,30 +588,27 @@ class GameImporter
 
     /**
      * Génère un slug unique sans inclure l'ID IGDB
-     * 
      * @param string $baseSlug Le slug de base généré à partir du titre
      * @param int|null $existingId L'ID du jeu existant (null si nouveau)
+     * @param array $slugMap (optionnel) Liste des slugs déjà générés dans cette importation
      * @return string Le slug unique
      */
-    private function generateUniqueSlug(string $baseSlug, ?int $existingId = null): string
+    private function generateUniqueSlug(string $baseSlug, ?int $existingId = null, array &$slugMap = []): string
     {
         $slug = $baseSlug;
-        $counter = 1;
-        
-        // Vérifier si le slug existe déjà (sauf pour le jeu actuel)
+        $counter = 2;
+        // Vérifier si le slug existe déjà (en base ou dans la map mémoire)
         while (true) {
             $existingGame = $this->gameRepository->findOneBy(['slug' => $slug]);
-            
+            $inMap = isset($slugMap[$slug]);
             // Si aucun jeu avec ce slug, ou si c'est le même jeu (mise à jour)
-            if (!$existingGame || ($existingId && $existingGame->getId() === $existingId)) {
+            if ((!$existingGame && !$inMap) || ($existingId && $existingGame && $existingGame->getId() === $existingId)) {
                 break;
             }
-            
-            // Sinon, ajouter un suffixe numérique
             $slug = $baseSlug . '-' . $counter;
             $counter++;
         }
-        
+        $slugMap[$slug] = true;
         return $slug;
     }
 

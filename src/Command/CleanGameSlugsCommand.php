@@ -134,30 +134,23 @@ class CleanGameSlugsCommand extends Command
     private function generateUniqueSlugWithMap(string $baseSlug, ?int $existingId, array &$slugMap): string
     {
         $slug = $baseSlug;
-        $counter = 1;
-        
+        $counter = 2;
         // Vérifier si le slug existe déjà dans notre map ou en base
         while (true) {
             $existingGame = $this->gameRepository->findOneBy(['slug' => $slug]);
             $inMap = isset($slugMap[$slug]);
-            
             // Si aucun jeu avec ce slug, ou si c'est le même jeu (mise à jour)
             if ((!$existingGame && !$inMap) || ($existingId && $existingGame && $existingGame->getId() === $existingId)) {
                 break;
             }
-            
-            // Sinon, ajouter un suffixe numérique
             $slug = $baseSlug . '-' . $counter;
             $counter++;
-            
-            // Éviter les boucles infinies
             if ($counter > 100) {
-                // Si on a trop de tentatives, ajouter un timestamp pour garantir l'unicité
                 $slug = $baseSlug . '-' . time();
                 break;
             }
         }
-        
+        $slugMap[$slug] = $existingId ?? true;
         return $slug;
     }
 } 
