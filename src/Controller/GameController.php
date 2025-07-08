@@ -305,37 +305,10 @@ class GameController extends AbstractController
             }
         }
 
-        // Sauvegarde en base
+        // Sauvegarder en base
         $gameRepository->getEntityManager()->flush();
 
         return new Response("Mise à jour terminée ! {$updatedCount} images améliorées.");
-    }
-
-    #[Route('/api/custom/games/top100', name: 'api_games_top100')]
-    public function getTop100Games(Request $request, GameRepository $gameRepository, IgdbClient $igdbClient): JsonResponse
-    {
-        $limit = (int) $request->query->get('limit', 5);
-        
-        // Récupère les jeux du Top 100
-        $games = $gameRepository->findTop100Games($limit);
-        
-        // Améliore automatiquement la qualité des images pour chaque jeu
-        foreach ($games as $game) {
-            if ($game->getCoverUrl()) {
-                // S'assurer que l'URL a le bon format
-                $coverUrl = $game->getCoverUrl();
-                if (strpos($coverUrl, '//') === 0) {
-                    $coverUrl = 'https:' . $coverUrl;
-                } elseif (!preg_match('/^https?:\/\//', $coverUrl)) {
-                    $coverUrl = 'https://' . $coverUrl;
-                }
-                
-                $improvedUrl = $igdbClient->improveImageQuality($coverUrl, 't_cover_big');
-                $game->setCoverUrl($improvedUrl);
-            }
-        }
-
-        return $this->json($games, 200, [], ['groups' => 'game:read']);
     }
 
     #[Route('/api/custom/games/year/top100', name: 'api_games_top100_year')]
