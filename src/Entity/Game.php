@@ -18,6 +18,8 @@ use App\Entity\Wallpaper;
 use App\Entity\Screenshot;
 use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
 use ApiPlatform\Metadata\ApiFilter;
+use App\Controller\Api\Top100GamesController;
+use App\Controller\Api\TopYearGamesController;
 
 #[ApiResource(
     normalizationContext: ['groups' => ['game:read']],

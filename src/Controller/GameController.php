@@ -745,4 +745,27 @@ class GameController extends AbstractController
 
         return new Response($response);
     }
+
+    #[Route('/api/test-top-year', name: 'api_test_top_year')]
+    public function testTopYear(GameRepository $gameRepository, IgdbClient $igdbClient): JsonResponse
+    {
+        $games = $gameRepository->findTopYearGamesDeduplicated(5, 80, 80);
+        
+        // Améliore automatiquement la qualité des images pour chaque jeu
+        foreach ($games as $game) {
+            if ($game->getCoverUrl()) {
+                $coverUrl = $game->getCoverUrl();
+                if (strpos($coverUrl, '//') === 0) {
+                    $coverUrl = 'https:' . $coverUrl;
+                } elseif (!preg_match('/^https?:\/\//', $coverUrl)) {
+                    $coverUrl = 'https://' . $coverUrl;
+                }
+                
+                $improvedUrl = $igdbClient->improveImageQuality($coverUrl, 't_cover_big');
+                $game->setCoverUrl($improvedUrl);
+            }
+        }
+
+        return $this->json($games, 200, [], ['groups' => 'game:read']);
+    }
 }
