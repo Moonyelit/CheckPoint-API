@@ -41,9 +41,25 @@ class Top100GamesProvider implements ProviderInterface
             $result[] = [
                 'id' => $game->getId(),
                 'title' => $game->getTitle(),
+                'name' => $game->getTitle(), // Compatibilité avec le front-end
                 'totalRating' => $game->getTotalRating(),
-                'platforms' => $game->getPlatforms(),
+                'total_rating' => $game->getTotalRating(), // Compatibilité avec le front-end
+                'platforms' => $game->getPlatforms() ? array_map(function($platform) {
+                    return ['name' => $platform];
+                }, $game->getPlatforms()) : [],
                 'coverUrl' => $coverUrl,
+                'cover' => $coverUrl ? ['url' => $coverUrl] : null,
+                'genres' => $game->getGenres() ? array_map(function($genre) {
+                    return ['name' => $genre];
+                }, $game->getGenres()) : [],
+                'gameModes' => $game->getGameModes() ? array_map(function($mode) {
+                    return ['name' => $mode];
+                }, $game->getGameModes()) : [],
+                'perspectives' => $game->getPerspectives() ? array_map(function($perspective) {
+                    return ['name' => $perspective];
+                }, $game->getPerspectives()) : [],
+                'releaseDate' => $game->getReleaseDate() ? $game->getReleaseDate()->format('Y-m-d') : null,
+                'first_release_date' => $game->getReleaseDate() ? $game->getReleaseDate()->getTimestamp() : null,
             ];
         }
 

@@ -311,6 +311,65 @@ class GameController extends AbstractController
         return new Response("Mise à jour terminée ! {$updatedCount} images améliorées.");
     }
 
+    #[Route('/api/custom/games/top100', name: 'api_games_top100')]
+    public function getTop100Games(Request $request, GameRepository $gameRepository, IgdbClient $igdbClient): JsonResponse
+    {
+        $limit = (int) $request->query->get('limit', 100);
+        
+        // Récupère les jeux du Top 100
+        $games = $gameRepository->findTop100Games($limit);
+        
+        // Améliore automatiquement la qualité des images pour chaque jeu
+        foreach ($games as $game) {
+            if ($game->getCoverUrl()) {
+                // S'assurer que l'URL a le bon format
+                $coverUrl = $game->getCoverUrl();
+                if (strpos($coverUrl, '//') === 0) {
+                    $coverUrl = 'https:' . $coverUrl;
+                } elseif (!preg_match('/^https?:\/\//', $coverUrl)) {
+                    $coverUrl = 'https://' . $coverUrl;
+                }
+                
+                $improvedUrl = $igdbClient->improveImageQuality($coverUrl, 't_cover_big');
+                $game->setCoverUrl($improvedUrl);
+            }
+        }
+
+        // Convertir en format compatible avec le front-end
+        $formattedGames = array_map(function($game) {
+            return [
+                'id' => $game->getId(),
+                'title' => $game->getTitle(),
+                'name' => $game->getTitle(), // Compatibilité avec le front-end
+                'slug' => $game->getSlug(),
+                'coverUrl' => $game->getCoverUrl(),
+                'cover' => $game->getCoverUrl() ? ['url' => $game->getCoverUrl()] : null,
+                'totalRating' => $game->getTotalRating(),
+                'total_rating' => $game->getTotalRating(), // Compatibilité avec le front-end
+                'platforms' => $game->getPlatforms() ? array_map(function($platform) {
+                    return ['name' => $platform];
+                }, $game->getPlatforms()) : [],
+                'genres' => $game->getGenres() ? array_map(function($genre) {
+                    return ['name' => $genre];
+                }, $game->getGenres()) : [],
+                'gameModes' => $game->getGameModes() ? array_map(function($mode) {
+                    return ['name' => $mode];
+                }, $game->getGameModes()) : [],
+                'perspectives' => $game->getPerspectives() ? array_map(function($perspective) {
+                    return ['name' => $perspective];
+                }, $game->getPerspectives()) : [],
+                'releaseDate' => $game->getReleaseDate() ? $game->getReleaseDate()->format('Y-m-d') : null,
+                'first_release_date' => $game->getReleaseDate() ? $game->getReleaseDate()->getTimestamp() : null,
+                'summary' => $game->getSummary(),
+                'developer' => $game->getDeveloper(),
+                'igdbId' => $game->getIgdbId(),
+                'isPersisted' => true
+            ];
+        }, $games);
+
+        return $this->json($formattedGames, 200, [], ['groups' => 'game:read']);
+    }
+
     #[Route('/api/custom/games/year/top100', name: 'api_games_top100_year')]
     public function getTopYearGames(Request $request, GameRepository $gameRepository, IgdbClient $igdbClient): JsonResponse
     {
@@ -336,7 +395,39 @@ class GameController extends AbstractController
             }
         }
 
-        return $this->json($games, 200, [], ['groups' => 'game:read']);
+        // Convertir en format compatible avec le front-end
+        $formattedGames = array_map(function($game) {
+            return [
+                'id' => $game->getId(),
+                'title' => $game->getTitle(),
+                'name' => $game->getTitle(), // Compatibilité avec le front-end
+                'slug' => $game->getSlug(),
+                'coverUrl' => $game->getCoverUrl(),
+                'cover' => $game->getCoverUrl() ? ['url' => $game->getCoverUrl()] : null,
+                'totalRating' => $game->getTotalRating(),
+                'total_rating' => $game->getTotalRating(), // Compatibilité avec le front-end
+                'platforms' => $game->getPlatforms() ? array_map(function($platform) {
+                    return ['name' => $platform];
+                }, $game->getPlatforms()) : [],
+                'genres' => $game->getGenres() ? array_map(function($genre) {
+                    return ['name' => $genre];
+                }, $game->getGenres()) : [],
+                'gameModes' => $game->getGameModes() ? array_map(function($mode) {
+                    return ['name' => $mode];
+                }, $game->getGameModes()) : [],
+                'perspectives' => $game->getPerspectives() ? array_map(function($perspective) {
+                    return ['name' => $perspective];
+                }, $game->getPerspectives()) : [],
+                'releaseDate' => $game->getReleaseDate() ? $game->getReleaseDate()->format('Y-m-d') : null,
+                'first_release_date' => $game->getReleaseDate() ? $game->getReleaseDate()->getTimestamp() : null,
+                'summary' => $game->getSummary(),
+                'developer' => $game->getDeveloper(),
+                'igdbId' => $game->getIgdbId(),
+                'isPersisted' => true
+            ];
+        }, $games);
+
+        return $this->json($formattedGames, 200, [], ['groups' => 'game:read']);
     }
 
     #[Route('/api/custom/games/{slug}', name: 'api_game_details', priority: -1)]
