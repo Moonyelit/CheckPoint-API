@@ -135,14 +135,6 @@ class Game
 
     #[ORM\Column(nullable: true)]
     #[Groups(['game:read', 'game:write'])]
-    private ?int $recentHypes = null;
-
-    #[ORM\Column(nullable: true)]
-    #[Groups(['game:read', 'game:write'])]
-    private ?int $follows = null;
-
-    #[ORM\Column(nullable: true)]
-    #[Groups(['game:read', 'game:write'])]
     private ?int $totalRatingCount = null;
 
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE, nullable: true)]
@@ -153,11 +145,52 @@ class Game
     #[Groups(['game:read', 'game:write'])]
     private ?string $category = null;
 
+    #[ORM\Column(length: 255, nullable: true)]
+    #[Groups(['game:read', 'game:write'])]
+    private ?string $publisher = null;
+
+    #[ORM\Column(nullable: true)]
+    #[Groups(['game:read', 'game:write'])]
+    private ?array $alternativeTitles = null;
+
+    #[ORM\Column(length: 50, nullable: true)]
+    #[Groups(['game:read', 'game:write'])]
+    private ?string $ageRating = null;
+
+    // Nouveaux champs pour compter les médias
+    #[ORM\Column(nullable: true)]
+    #[Groups(['game:read', 'game:write'])]
+    private ?int $screenshotsCount = null;
+
+    #[ORM\Column(nullable: true)]
+    #[Groups(['game:read', 'game:write'])]
+    private ?int $artworksCount = null;
+
+    #[ORM\Column(nullable: true)]
+    #[Groups(['game:read', 'game:write'])]
+    private ?int $videosCount = null;
+
+    /**
+     * @var Collection<int, Artwork>
+     */
+    #[ORM\OneToMany(mappedBy: 'game', targetEntity: Artwork::class, cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[Groups(['game:read', 'game:write'])]
+    private Collection $artworks;
+
+    /**
+     * @var Collection<int, Video>
+     */
+    #[ORM\OneToMany(mappedBy: 'game', targetEntity: Video::class, cascade: ['persist', 'remove'], orphanRemoval: true)]
+    #[Groups(['game:read', 'game:write'])]
+    private Collection $videos;
+
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
         $this->wallpapers = new ArrayCollection();
         $this->screenshots = new ArrayCollection();
+        $this->artworks = new ArrayCollection();
+        $this->videos = new ArrayCollection();
     }
 
     #[ORM\PrePersist]
@@ -390,6 +423,7 @@ class Game
 
         $this->screenshots->add($screenshot);
         $screenshot->setGame($this);
+        $this->screenshotsCount = $this->screenshots->count();
 
         return $this;
     }
@@ -401,7 +435,7 @@ class Game
                 $screenshot->setGame(null);
             }
         }
-
+        $this->screenshotsCount = $this->screenshots->count();
         return $this;
     }
 
@@ -425,30 +459,6 @@ class Game
     public function setUpdatedAt(?\DateTimeImmutable $updatedAt): static
     {
         $this->updatedAt = $updatedAt;
-
-        return $this;
-    }
-
-    public function getRecentHypes(): ?int
-    {
-        return $this->recentHypes;
-    }
-
-    public function setRecentHypes(?int $recentHypes): static
-    {
-        $this->recentHypes = $recentHypes;
-
-        return $this;
-    }
-
-    public function getFollows(): ?int
-    {
-        return $this->follows;
-    }
-
-    public function setFollows(?int $follows): static
-    {
-        $this->follows = $follows;
 
         return $this;
     }
@@ -489,6 +499,132 @@ class Game
         return $this;
     }
 
+    public function getPublisher(): ?string
+    {
+        return $this->publisher;
+    }
+
+    public function setPublisher(?string $publisher): static
+    {
+        $this->publisher = $publisher;
+
+        return $this;
+    }
+
+    public function getAlternativeTitles(): ?array
+    {
+        return $this->alternativeTitles;
+    }
+
+    public function setAlternativeTitles(?array $alternativeTitles): static
+    {
+        $this->alternativeTitles = $alternativeTitles;
+
+        return $this;
+    }
+
+    public function getAgeRating(): ?string
+    {
+        return $this->ageRating;
+    }
+
+    public function setAgeRating(?string $ageRating): static
+    {
+        $this->ageRating = $ageRating;
+
+        return $this;
+    }
+
+    public function getScreenshotsCount(): ?int
+    {
+        return $this->screenshotsCount;
+    }
+
+    public function setScreenshotsCount(?int $screenshotsCount): static
+    {
+        $this->screenshotsCount = $screenshotsCount;
+
+        return $this;
+    }
+
+    public function getArtworksCount(): ?int
+    {
+        return $this->artworksCount;
+    }
+
+    public function setArtworksCount(?int $artworksCount): static
+    {
+        $this->artworksCount = $artworksCount;
+
+        return $this;
+    }
+
+    public function getVideosCount(): ?int
+    {
+        return $this->videosCount;
+    }
+
+    public function setVideosCount(?int $videosCount): static
+    {
+        $this->videosCount = $videosCount;
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Artwork>
+     */
+    public function getArtworks(): Collection
+    {
+        return $this->artworks;
+    }
+
+    public function addArtwork(Artwork $artwork): static
+    {
+        if (!$this->artworks->contains($artwork)) {
+            $this->artworks->add($artwork);
+            $artwork->setGame($this);
+        }
+        return $this;
+    }
+
+    public function removeArtwork(Artwork $artwork): static
+    {
+        if ($this->artworks->removeElement($artwork)) {
+            if ($artwork->getGame() === $this) {
+                $artwork->setGame(null);
+            }
+        }
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, Video>
+     */
+    public function getVideos(): Collection
+    {
+        return $this->videos;
+    }
+
+    public function addVideo(Video $video): static
+    {
+        if (!$this->videos->contains($video)) {
+            $this->videos->add($video);
+            $video->setGame($this);
+        }
+        return $this;
+    }
+
+    public function removeVideo(Video $video): static
+    {
+        if ($this->videos->removeElement($video)) {
+            if ($video->getGame() === $this) {
+                $video->setGame(null);
+            }
+        }
+        return $this;
+    }
+
     /**
      * Récupère le premier screenshot du jeu pour l'utiliser comme image de fond.
      * 
@@ -520,5 +656,21 @@ class Game
         }
         
         return $decodedUrl;
+    }
+
+    /**
+     * Récupère le premier screenshot du jeu pour l'utiliser dans le header.
+     * 
+     * @return Screenshot|null Le premier screenshot ou null si aucun screenshot n'est disponible
+     */
+    #[Groups(['game:read'])]
+    public function getFirstScreenshot(): ?Screenshot
+    {
+        $screenshots = $this->getScreenshots();
+        if ($screenshots->isEmpty()) {
+            return null;
+        }
+        
+        return $screenshots->first();
     }
 }
