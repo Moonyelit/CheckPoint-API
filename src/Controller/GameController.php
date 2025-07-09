@@ -17,7 +17,6 @@ use Symfony\Contracts\HttpClient\HttpClientInterface;
 use App\Service\GameImporter;
 use App\Repository\GameRepository;
 use Symfony\Component\HttpFoundation\Request;
-use App\Service\GameSearchService;
 
 /**
  * 🎮 CONTRÔLEUR PRINCIPAL - GESTION GLOBALE DES JEUX
@@ -28,9 +27,12 @@ use App\Service\GameSearchService;
  * 🔧 FONCTIONNALITÉS PRINCIPALES :
  * 
  * 🔍 RECHERCHE :
- * - /api/games/search/{name} : Recherche API avec rate limiting
+ * - /api/games/search/{name} : [OBSOLÈTE] Ancien endpoint de recherche - remplacé par API Platform
  * - /games/search/{query} : Vue Twig pour affichage frontend
  * - /api/games/search-or-import/{query} : Recherche intelligente avec import auto
+ * - /api/games/search-with-fallback/{query} : [OBSOLÈTE] Ancien endpoint avec fallback
+ * - /api/games/search-local/{query} : [OBSOLÈTE] Ancien endpoint de recherche locale
+ * - /api/games/search-igdb/{query} : [OBSOLÈTE] Ancien endpoint de recherche IGDB
  * 
  * 📥 IMPORT ADMIN :
  * - /admin/import-popular-games : Import jeux populaires
@@ -55,6 +57,11 @@ use App\Service\GameSearchService;
  * - Injection de dépendances (IgdbClient, GameImporter, etc.)
  * - Délégation vers services spécialisés
  * - Réponses JSON pour API, vues Twig pour pages
+ * 
+ * ⚠️ MIGRATION API PLATFORM :
+ * - Les anciens endpoints de recherche ont été remplacés par API Platform
+ * - Utilisez /api/games avec les filtres custom pour la recherche
+ * - Les endpoints obsolètes retournent 410 (Gone) avec un message explicatif
  */
 
 class GameController extends AbstractController
@@ -64,7 +71,6 @@ class GameController extends AbstractController
 
     public function __construct(
         #[Autowire(service: 'limiter.apiSearchLimit')] RateLimiterFactory $apiSearchLimitFactory,
-        private GameSearchService $gameSearchService,
         private HttpClientInterface $client,
         LoggerInterface $logger
     ) {
@@ -75,94 +81,12 @@ class GameController extends AbstractController
     #[Route('/api/games/search/{name}', name: 'api_game_search')]
     public function search(string $name, Request $request): JsonResponse
     {
-        // Limite les requêtes API.
-        $limit = $this->limiter->consume();
-
-        if (!$limit->isAccepted()) {
-            throw new TooManyRequestsHttpException('Trop de requêtes.');
-        }
-
-        // Récupère les paramètres de pagination
-        $page = max(1, (int) $request->query->get('page', 1));
-        $limit = (int) $request->query->get('limit', 20);
-
-        try {
-            // Utilise le GameSearchService pour une recherche avec fallback
-            $result = $this->gameSearchService->searchWithFallback($name);
-            
-            // Sérialise manuellement les entités Game ou les tableaux IGDB
-            $games = array_map(function($game) {
-                // Si c'est un tableau IGDB (non persisté)
-                if (is_array($game)) {
-                    return $game;
-                }
-                // Sinon, entité persistée
-                return [
-                    'id' => $game->getId(),
-                    'title' => $game->getTitle(),
-                    'name' => $game->getTitle(), // Compatibilité avec le front-end
-                    'slug' => $game->getSlug(),
-                    'coverUrl' => $game->getCoverUrl(),
-                    'cover' => $game->getCoverUrl() ? ['url' => $game->getCoverUrl()] : null,
-                    'totalRating' => $game->getTotalRating(),
-                    'total_rating' => $game->getTotalRating(), // Compatibilité avec le front-end
-                    'platforms' => $game->getPlatforms() ? array_map(function($platform) {
-                        return ['name' => $platform];
-                    }, $game->getPlatforms()) : [],
-                    'genres' => $game->getGenres() ? array_map(function($genre) {
-                        return ['name' => $genre];
-                    }, $game->getGenres()) : [],
-                    'gameModes' => $game->getGameModes() ? array_map(function($mode) {
-                        return ['name' => $mode];
-                    }, $game->getGameModes()) : [],
-                    'perspectives' => $game->getPerspectives() ? array_map(function($perspective) {
-                        return ['name' => $perspective];
-                    }, $game->getPerspectives()) : [],
-                    'releaseDate' => $game->getReleaseDate() ? $game->getReleaseDate()->format('Y-m-d') : null,
-                    'first_release_date' => $game->getReleaseDate() ? $game->getReleaseDate()->getTimestamp() : null,
-                    'summary' => $game->getSummary(),
-                    'developer' => $game->getDeveloper(),
-                    'igdbId' => $game->getIgdbId(),
-                    'isPersisted' => true
-                ];
-            }, $result['games']);
-            
-            // Applique la pagination côté serveur
-            $totalCount = count($games);
-            $offset = ($page - 1) * $limit;
-            $paginatedGames = array_slice($games, $offset, $limit);
-            
-            $this->logger->info(sprintf("Recherche '%s': %d jeux au total, page %d/%d (%d jeux affichés)", 
-                $name, $totalCount, $page, ceil($totalCount / $limit), count($paginatedGames)));
-            
+        // Ancien endpoint de recherche - OBSOLÈTE
+        // Remplacé par API Platform avec filtres custom
             return $this->json([
-                'games' => $paginatedGames,
-                'pagination' => [
-                    'currentPage' => $page,
-                    'limit' => $limit,
-                    'offset' => $offset,
-                    'totalCount' => $totalCount,
-                    'totalPages' => max(1, ceil($totalCount / $limit))
-                ],
-                'source' => $result['source'],
-                'message' => $result['message']
-            ]);
-        } catch (\Throwable $e) {
-            $this->logger->error("Erreur lors de la recherche pour '{$name}': " . $e->getMessage());
-            
-            return $this->json([
-                'games' => [],
-                'pagination' => [
-                    'currentPage' => $page,
-                    'limit' => $limit,
-                    'offset' => 0,
-                    'totalCount' => 0,
-                    'totalPages' => 0
-                ],
-                'error' => 'Erreur lors de la recherche',
-                'message' => 'Impossible de récupérer les résultats'
-            ], 500);
-        }
+            'error' => 'Endpoint obsolète. Utilisez /api/games avec les filtres API Platform.',
+            'message' => 'Cet endpoint a été remplacé par API Platform'
+        ], 410); // Gone - ressource supprimée
     }
 
     #[Route('/games/search/{query}', name: 'games_search')]
@@ -211,9 +135,16 @@ class GameController extends AbstractController
         $localGames = $gameRepository->findByTitleLike($query);
         $this->logger->info(sprintf("Trouvé %d jeux en base locale", count($localGames)));
 
-        // 2. On essaie d'importer depuis IGDB pour enrichir les résultats
+        // 2. Si on a suffisamment de résultats locaux, on les renvoie directement
+        if (count($localGames) >= 5) {
+            $this->logger->info("Résultats locaux suffisants, pas d'import IGDB nécessaire");
+            return $this->json($localGames, 200, [], ['groups' => 'game:read']);
+        }
+
+        // 3. Si peu de résultats locaux, on importe depuis IGDB pour enrichir
         $importedGames = [];
         try {
+            $this->logger->info("Peu de résultats locaux, import IGDB pour enrichir");
             $importedGames = $gameImporter->importGamesBySearch($query);
             $this->logger->info(sprintf("Importé %d jeux depuis IGDB", count($importedGames)));
         } catch (\Throwable $e) {
@@ -225,7 +156,7 @@ class GameController extends AbstractController
             return $this->json(['error' => 'Aucun jeu trouvé localement et erreur lors de l\'import IGDB'], 404);
         }
 
-        // 3. Fusion intelligente : priorité aux jeux locaux, puis ajout des nouveaux
+        // 4. Fusion intelligente : priorité aux jeux locaux, puis ajout des nouveaux
         $finalGames = [];
         $localGameIds = array_map(fn($game) => $game->getIgdbId(), $localGames);
         
@@ -235,15 +166,48 @@ class GameController extends AbstractController
         }
         
         // Ajoute les jeux importés qui ne sont pas déjà en local
+        $addedIgdb = 0;
         foreach ($importedGames as $importedGame) {
             if (!in_array($importedGame->getIgdbId(), $localGameIds)) {
                 $finalGames[] = $importedGame;
+                $addedIgdb++;
+            }
+        }
+        $this->logger->info(sprintf("Fusion finale : %d jeux locaux + %d jeux IGDB ajoutés (total: %d)", count($localGames), $addedIgdb, count($finalGames)));
+
+        // 5. Si on a encore moins de 10 résultats, essayer une recherche plus large
+        if (count($finalGames) < 10) {
+            $this->logger->info("Peu de résultats, tentative de recherche élargie");
+            
+            // Essayer avec des variantes du terme de recherche
+            $variants = [
+                $query,
+                ucfirst($query),
+                str_replace('-', ' ', $query),
+                str_replace('-', ' ', ucfirst($query))
+            ];
+            
+            foreach ($variants as $variant) {
+                if ($variant !== $query) {
+                    try {
+                        $additionalGames = $gameImporter->importGamesBySearch($variant);
+                        foreach ($additionalGames as $additionalGame) {
+                            if (!in_array($additionalGame->getIgdbId(), array_map(fn($g) => $g->getIgdbId(), $finalGames))) {
+                                $finalGames[] = $additionalGame;
+                            }
+                        }
+                        $this->logger->info(sprintf("Ajouté %d jeux avec la variante '%s'", count($additionalGames), $variant));
+                    } catch (\Throwable $e) {
+                        $this->logger->warning("Erreur avec la variante '{$variant}': " . $e->getMessage());
+                    }
+                }
             }
         }
 
         $this->logger->info(sprintf("Résultat final : %d jeux (local: %d, importé: %d)", 
             count($finalGames), count($localGames), count($importedGames) - count($localGames)));
 
+        // On retourne TOUJOURS la fusion locale + IGDB, même si la base locale contient déjà des jeux
         return $this->json($finalGames, 200, [], ['groups' => 'game:read']);
     }
 
@@ -309,125 +273,6 @@ class GameController extends AbstractController
         $gameRepository->getEntityManager()->flush();
 
         return new Response("Mise à jour terminée ! {$updatedCount} images améliorées.");
-    }
-
-    #[Route('/api/custom/games/top100', name: 'api_games_top100')]
-    public function getTop100Games(Request $request, GameRepository $gameRepository, IgdbClient $igdbClient): JsonResponse
-    {
-        $limit = (int) $request->query->get('limit', 100);
-        
-        // Récupère les jeux du Top 100
-        $games = $gameRepository->findTop100Games($limit);
-        
-        // Améliore automatiquement la qualité des images pour chaque jeu
-        foreach ($games as $game) {
-            if ($game->getCoverUrl()) {
-                // S'assurer que l'URL a le bon format
-                $coverUrl = $game->getCoverUrl();
-                if (strpos($coverUrl, '//') === 0) {
-                    $coverUrl = 'https:' . $coverUrl;
-                } elseif (!preg_match('/^https?:\/\//', $coverUrl)) {
-                    $coverUrl = 'https://' . $coverUrl;
-                }
-                
-                $improvedUrl = $igdbClient->improveImageQuality($coverUrl, 't_cover_big');
-                $game->setCoverUrl($improvedUrl);
-            }
-        }
-
-        // Convertir en format compatible avec le front-end
-        $formattedGames = array_map(function($game) {
-            return [
-                'id' => $game->getId(),
-                'title' => $game->getTitle(),
-                'name' => $game->getTitle(), // Compatibilité avec le front-end
-                'slug' => $game->getSlug(),
-                'coverUrl' => $game->getCoverUrl(),
-                'cover' => $game->getCoverUrl() ? ['url' => $game->getCoverUrl()] : null,
-                'totalRating' => $game->getTotalRating(),
-                'total_rating' => $game->getTotalRating(), // Compatibilité avec le front-end
-                'platforms' => $game->getPlatforms() ? array_map(function($platform) {
-                    return ['name' => $platform];
-                }, $game->getPlatforms()) : [],
-                'genres' => $game->getGenres() ? array_map(function($genre) {
-                    return ['name' => $genre];
-                }, $game->getGenres()) : [],
-                'gameModes' => $game->getGameModes() ? array_map(function($mode) {
-                    return ['name' => $mode];
-                }, $game->getGameModes()) : [],
-                'perspectives' => $game->getPerspectives() ? array_map(function($perspective) {
-                    return ['name' => $perspective];
-                }, $game->getPerspectives()) : [],
-                'releaseDate' => $game->getReleaseDate() ? $game->getReleaseDate()->format('Y-m-d') : null,
-                'first_release_date' => $game->getReleaseDate() ? $game->getReleaseDate()->getTimestamp() : null,
-                'summary' => $game->getSummary(),
-                'developer' => $game->getDeveloper(),
-                'igdbId' => $game->getIgdbId(),
-                'isPersisted' => true
-            ];
-        }, $games);
-
-        return $this->json($formattedGames, 200, [], ['groups' => 'game:read']);
-    }
-
-    #[Route('/api/custom/games/year/top100', name: 'api_games_top100_year')]
-    public function getTopYearGames(Request $request, GameRepository $gameRepository, IgdbClient $igdbClient): JsonResponse
-    {
-        $limit = (int) $request->query->get('limit', 5);
-        
-        // Récupère les jeux de l'année (365 derniers jours) DÉDUPLIQUÉS par nom principal
-        // Évite les doublons comme "Clair Obscur: Expedition 33" et "Clair Obscur: Expedition 33 – Deluxe Edition"
-        $games = $gameRepository->findTopYearGamesDeduplicated($limit, 80, 80);
-        
-        // Améliore automatiquement la qualité des images pour chaque jeu
-        foreach ($games as $game) {
-            if ($game->getCoverUrl()) {
-                // S'assurer que l'URL a le bon format
-                $coverUrl = $game->getCoverUrl();
-                if (strpos($coverUrl, '//') === 0) {
-                    $coverUrl = 'https:' . $coverUrl;
-                } elseif (!preg_match('/^https?:\/\//', $coverUrl)) {
-                    $coverUrl = 'https://' . $coverUrl;
-                }
-                
-                $improvedUrl = $igdbClient->improveImageQuality($coverUrl, 't_cover_big');
-                $game->setCoverUrl($improvedUrl);
-            }
-        }
-
-        // Convertir en format compatible avec le front-end
-        $formattedGames = array_map(function($game) {
-            return [
-                'id' => $game->getId(),
-                'title' => $game->getTitle(),
-                'name' => $game->getTitle(), // Compatibilité avec le front-end
-                'slug' => $game->getSlug(),
-                'coverUrl' => $game->getCoverUrl(),
-                'cover' => $game->getCoverUrl() ? ['url' => $game->getCoverUrl()] : null,
-                'totalRating' => $game->getTotalRating(),
-                'total_rating' => $game->getTotalRating(), // Compatibilité avec le front-end
-                'platforms' => $game->getPlatforms() ? array_map(function($platform) {
-                    return ['name' => $platform];
-                }, $game->getPlatforms()) : [],
-                'genres' => $game->getGenres() ? array_map(function($genre) {
-                    return ['name' => $genre];
-                }, $game->getGenres()) : [],
-                'gameModes' => $game->getGameModes() ? array_map(function($mode) {
-                    return ['name' => $mode];
-                }, $game->getGameModes()) : [],
-                'perspectives' => $game->getPerspectives() ? array_map(function($perspective) {
-                    return ['name' => $perspective];
-                }, $game->getPerspectives()) : [],
-                'releaseDate' => $game->getReleaseDate() ? $game->getReleaseDate()->format('Y-m-d') : null,
-                'first_release_date' => $game->getReleaseDate() ? $game->getReleaseDate()->getTimestamp() : null,
-                'summary' => $game->getSummary(),
-                'developer' => $game->getDeveloper(),
-                'igdbId' => $game->getIgdbId(),
-                'isPersisted' => true
-            ];
-        }, $games);
-
-        return $this->json($formattedGames, 200, [], ['groups' => 'game:read']);
     }
 
     #[Route('/api/custom/games/{slug}', name: 'api_game_details', priority: -1)]
@@ -570,37 +415,6 @@ class GameController extends AbstractController
     {
         $slugify = new \Cocur\Slugify\Slugify();
         return $slugify->slugify($title);
-    }
-
-    #[Route('/api/games/search-with-fallback/{query}', name: 'api_game_search_with_fallback')]
-    public function searchWithFallback(string $query, Request $request): JsonResponse
-    {
-        $forceIgdb = $request->query->get('force_igdb', false);
-        $result = $this->gameSearchService->searchWithFallback($query, $forceIgdb);
-        
-        $statusCode = $result['source'] === 'error' ? 500 : 
-                     ($result['total'] === 0 ? 404 : 200);
-        
-        return $this->json($result, $statusCode, [], ['groups' => 'game:read']);
-    }
-
-    #[Route('/api/games/search-local/{query}', name: 'api_game_search_local')]
-    public function searchLocal(string $query): JsonResponse
-    {
-        $result = $this->gameSearchService->searchLocal($query);
-        
-        $statusCode = $result['total'] === 0 ? 404 : 200;
-        return $this->json($result, $statusCode, [], ['groups' => 'game:read']);
-    }
-
-    #[Route('/api/games/search-igdb/{query}', name: 'api_game_search_igdb')]
-    public function searchIgdb(string $query): JsonResponse
-    {
-        $result = $this->gameSearchService->searchIgdb($query);
-        
-        $statusCode = $result['source'] === 'error' ? 500 : 
-                     ($result['total'] === 0 ? 404 : 200);
-        return $this->json($result, $statusCode, [], ['groups' => 'game:read']);
     }
 
     #[Route('/api/test', name: 'api_test')]
@@ -831,5 +645,290 @@ class GameController extends AbstractController
         }
 
         return $this->json($games, 200, [], ['groups' => 'game:read']);
+    }
+
+    #[Route('/api/filters', name: 'api_filters')]
+    public function getFilters(GameRepository $gameRepository): JsonResponse
+    {
+        // Récupère tous les filtres disponibles depuis la base de données
+        $filters = [
+            'genres' => [
+                'label' => 'Genres',
+                'values' => $gameRepository->getDistinctGenres()
+            ],
+            'platforms' => [
+                'label' => 'Plateformes',
+                'values' => $gameRepository->getDistinctPlatforms()
+            ],
+            'gameModes' => [
+                'label' => 'Modes de jeu',
+                'values' => $gameRepository->getDistinctGameModes()
+            ],
+            'perspectives' => [
+                'label' => 'Perspectives',
+                'values' => $gameRepository->getDistinctPerspectives()
+            ]
+        ];
+
+        return $this->json($filters);
+    }
+
+    #[Route('/api/games/search-fast/{query}', name: 'api_game_search_fast')]
+    public function searchGameFast(string $query, GameImporter $gameImporter, GameRepository $gameRepository): JsonResponse
+    {
+        $this->logger->info("Recherche rapide pour : '{$query}'");
+
+        // Cache simple en mémoire (pour cette requête uniquement)
+        static $cache = [];
+        $cacheKey = md5($query);
+        
+        // Vérifier le cache
+        if (isset($cache[$cacheKey])) {
+            $this->logger->info("Résultats récupérés depuis le cache pour : '{$query}'");
+            return $this->json($cache[$cacheKey], 200, [], ['groups' => 'game:read']);
+        }
+
+        // 1. Recherche locale d'abord (très rapide)
+        $localGames = $gameRepository->findByTitleLike($query);
+        $this->logger->info(sprintf("Trouvé %d jeux en base locale", count($localGames)));
+
+        // 2. Recherche IGDB rapide (sans persistance) - TOUJOURS effectuée
+        $igdbGames = [];
+        try {
+            $this->logger->info("Recherche IGDB pour enrichir les résultats");
+            $igdbGames = $gameImporter->searchGamesWithoutPersist($query);
+            $this->logger->info(sprintf("Trouvé %d jeux IGDB (non persistés)", count($igdbGames)));
+        } catch (\Throwable $e) {
+            $this->logger->error("Erreur lors de la recherche IGDB: " . $e->getMessage());
+            // Si la recherche IGDB échoue, on renvoie au moins les résultats locaux
+            if (!empty($localGames)) {
+                $cache[$cacheKey] = $localGames;
+                return $this->json($localGames, 200, [], ['groups' => 'game:read']);
+            }
+            return $this->json(['error' => 'Aucun jeu trouvé'], 404);
+        }
+
+        // 3. Fusion des résultats : jeux locaux + jeux IGDB non persistés
+        $finalGames = [];
+        
+        // Ajoute d'abord tous les jeux locaux
+        foreach ($localGames as $localGame) {
+            $finalGames[] = $localGame;
+        }
+        
+        // Ajoute les jeux IGDB qui ne sont pas déjà en local
+        $localIgdbIds = array_map(fn($game) => $game->getIgdbId(), $localGames);
+        $addedIgdb = 0;
+        
+        foreach ($igdbGames as $igdbGame) {
+            if (!in_array($igdbGame['igdbId'], $localIgdbIds)) {
+                $finalGames[] = $igdbGame;
+                $addedIgdb++;
+            }
+        }
+        
+        $this->logger->info(sprintf("Fusion finale : %d jeux locaux + %d jeux IGDB ajoutés (total: %d)", 
+            count($localGames), $addedIgdb, count($finalGames)));
+
+        // Mettre en cache les résultats
+        $cache[$cacheKey] = $finalGames;
+
+        return $this->json($finalGames, 200, [], ['groups' => 'game:read']);
+    }
+
+    #[Route('/api/games/search-intelligent/{query}', name: 'api_game_search_intelligent')]
+    public function searchIntelligent(string $query, GameImporter $gameImporter, GameRepository $gameRepository): JsonResponse
+    {
+        $this->logger->info("Recherche intelligente pour : '{$query}'");
+
+        // Cache simple en mémoire
+        static $cache = [];
+        $cacheKey = 'intelligent_' . md5($query);
+        
+        if (isset($cache[$cacheKey])) {
+            $this->logger->info("Résultats intelligents récupérés depuis le cache");
+            return $this->json($cache[$cacheKey], 200, [], ['groups' => 'game:read']);
+        }
+
+        // 1. Recherche locale : phrase complète + mots individuels
+        $localGames = $gameRepository->findByTitleLike($query);
+        $this->logger->info(sprintf("Trouvé %d jeux en base locale", count($localGames)));
+
+        // 2. Recherche IGDB : même logique
+        $igdbGames = [];
+        try {
+            $this->logger->info("Recherche IGDB pour enrichir");
+            $igdbGames = $gameImporter->searchGamesWithoutPersist($query);
+            $this->logger->info(sprintf("Trouvé %d jeux IGDB", count($igdbGames)));
+        } catch (\Throwable $e) {
+            $this->logger->error("Erreur recherche IGDB: " . $e->getMessage());
+            if (!empty($localGames)) {
+                $cache[$cacheKey] = $localGames;
+                return $this->json($localGames, 200, [], ['groups' => 'game:read']);
+            }
+            return $this->json(['error' => 'Aucun jeu trouvé'], 404);
+        }
+
+        // 3. Fusion intelligente avec déduplication basée sur l'igdbId
+        $finalGames = [];
+        $seenIgdbIds = [];
+        
+        // Ajoute d'abord tous les jeux locaux (priorité)
+        foreach ($localGames as $localGame) {
+            $finalGames[] = $localGame;
+            $seenIgdbIds[] = $localGame->getIgdbId();
+        }
+        
+        // Ajoute les jeux IGDB qui ne sont pas déjà en local
+        $addedIgdb = 0;
+        foreach ($igdbGames as $igdbGame) {
+            if (!in_array($igdbGame['igdbId'], $seenIgdbIds)) {
+                $finalGames[] = $igdbGame;
+                $seenIgdbIds[] = $igdbGame['igdbId'];
+                $addedIgdb++;
+            }
+        }
+        
+        $this->logger->info(sprintf("Fusion avec déduplication : %d jeux locaux + %d jeux IGDB ajoutés (total: %d)", 
+            count($localGames), $addedIgdb, count($finalGames)));
+
+        // 4. Filtrage intelligent avec regex pour éviter les faux positifs
+        $filteredGames = $this->filterGamesIntelligently($finalGames, $query);
+        $this->logger->info(sprintf("Après filtrage intelligent : %d jeux", count($filteredGames)));
+
+        // 5. Tri intelligent par pertinence
+        $finalGames = $this->sortGamesByRelevance($filteredGames, $query);
+        
+        $this->logger->info(sprintf("Résultats finaux : %d jeux triés par pertinence", count($finalGames)));
+
+        // Cache les résultats
+        $cache[$cacheKey] = $finalGames;
+
+        return $this->json($finalGames, 200, [], ['groups' => 'game:read']);
+    }
+
+    /**
+     * Filtrage intelligent avec regex pour éviter les faux positifs
+     */
+    private function filterGamesIntelligently(array $games, string $query): array
+    {
+        $words = preg_split('/\s+/', trim($query));
+        $filteredWords = array_filter($words, function($word) {
+            $shortWords = ['the', 'and', 'of', 'in', 'on', 'at', 'to', 'for', 'with', 'by', 'her', 'his', 'my', 'your', 'our', 'their'];
+            return strlen($word) >= 4 && !in_array(strtolower($word), $shortWords);
+        });
+
+        if (empty($filteredWords)) {
+            return $games; // Pas de filtrage si pas de mots valides
+        }
+
+        $filteredGames = [];
+        foreach ($games as $game) {
+            // Gérer les objets Game et les tableaux IGDB
+            $title = '';
+            if (is_object($game) && method_exists($game, 'getTitle')) {
+                $title = $game->getTitle() ?? '';
+            } elseif (is_array($game) && isset($game['title'])) {
+                $title = $game['title'] ?? '';
+            } elseif (is_array($game) && isset($game['name'])) {
+                $title = $game['name'] ?? '';
+            }
+            
+            $titleLower = mb_strtolower($title);
+            
+            $allMatch = true;
+            foreach ($filteredWords as $word) {
+                // Regex avec word boundary pour éviter "light" dans "twilight"
+                if (!preg_match('/\\b' . preg_quote(mb_strtolower($word), '/') . '\\b/u', $titleLower)) {
+                    $allMatch = false;
+                    break;
+                }
+            }
+            
+            if ($allMatch) {
+                $filteredGames[] = $game;
+            }
+        }
+
+        return $filteredGames;
+    }
+
+    /**
+     * Tri intelligent par pertinence
+     */
+    private function sortGamesByRelevance(array $games, string $query): array
+    {
+        $queryLower = mb_strtolower($query);
+        
+        usort($games, function($a, $b) use ($queryLower) {
+            // Gérer les objets Game et les tableaux IGDB pour le titre
+            $titleA = '';
+            $titleB = '';
+            
+            if (is_object($a) && method_exists($a, 'getTitle')) {
+                $titleA = $a->getTitle() ?? '';
+            } elseif (is_array($a) && isset($a['title'])) {
+                $titleA = $a['title'] ?? '';
+            } elseif (is_array($a) && isset($a['name'])) {
+                $titleA = $a['name'] ?? '';
+            }
+            
+            if (is_object($b) && method_exists($b, 'getTitle')) {
+                $titleB = $b->getTitle() ?? '';
+            } elseif (is_array($b) && isset($b['title'])) {
+                $titleB = $b['title'] ?? '';
+            } elseif (is_array($b) && isset($b['name'])) {
+                $titleB = $b['name'] ?? '';
+            }
+            
+            $titleA = mb_strtolower($titleA);
+            $titleB = mb_strtolower($titleB);
+            
+            // 1. Priorité : correspondance exacte de la phrase
+            $exactMatchA = $titleA === $queryLower;
+            $exactMatchB = $titleB === $queryLower;
+            
+            if ($exactMatchA && !$exactMatchB) return -1;
+            if (!$exactMatchA && $exactMatchB) return 1;
+            
+            // 2. Priorité : commence par la phrase
+            $startsWithA = strpos($titleA, $queryLower) === 0;
+            $startsWithB = strpos($titleB, $queryLower) === 0;
+            
+            if ($startsWithA && !$startsWithB) return -1;
+            if (!$startsWithA && $startsWithB) return 1;
+            
+            // 3. Priorité : contient la phrase
+            $containsA = strpos($titleA, $queryLower) !== false;
+            $containsB = strpos($titleB, $queryLower) !== false;
+            
+            if ($containsA && !$containsB) return -1;
+            if (!$containsA && $containsB) return 1;
+            
+            // 4. Tri par note (si disponible)
+            $ratingA = 0;
+            $ratingB = 0;
+            
+            if (is_object($a) && method_exists($a, 'getTotalRating')) {
+                $ratingA = $a->getTotalRating() ?? 0;
+            } elseif (is_array($a) && isset($a['totalRating'])) {
+                $ratingA = $a['totalRating'] ?? 0;
+            }
+            
+            if (is_object($b) && method_exists($b, 'getTotalRating')) {
+                $ratingB = $b->getTotalRating() ?? 0;
+            } elseif (is_array($b) && isset($b['totalRating'])) {
+                $ratingB = $b['totalRating'] ?? 0;
+            }
+            
+            if ($ratingA !== $ratingB) {
+                return $ratingB <=> $ratingA; // Décroissant
+            }
+            
+            // 5. Tri alphabétique
+            return $titleA <=> $titleB;
+        });
+        
+        return $games;
     }
 }

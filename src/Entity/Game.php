@@ -20,6 +20,9 @@ use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
 use ApiPlatform\Metadata\ApiFilter;
 use App\Controller\Api\Top100GamesController;
 use App\Controller\Api\TopYearGamesController;
+use App\Filter\JsonSearchFilter;
+use ApiPlatform\Doctrine\Orm\Filter\OrderFilter;
+use ApiPlatform\Doctrine\Orm\Filter\DateFilter;
 
 #[ApiResource(
     normalizationContext: ['groups' => ['game:read']],
@@ -34,7 +37,25 @@ use App\Controller\Api\TopYearGamesController;
         new Delete(security: "is_granted('ROLE_ADMIN')"),
     ]
 )]
-#[ApiFilter(SearchFilter::class, properties: ['title' => 'partial'])]
+#[ApiFilter(SearchFilter::class, properties: [
+    'title' => 'partial',
+    'developer' => 'partial'
+])]
+#[ApiFilter(JsonSearchFilter::class, properties: [
+    'genres' => 'partial',
+    'platforms' => 'partial', 
+    'gameModes' => 'partial',
+    'perspectives' => 'partial'
+])]
+#[ApiFilter(OrderFilter::class, properties: [
+    'title' => 'ASC',
+    'totalRating' => 'DESC',
+    'totalRatingCount' => 'DESC',
+    'releaseDate' => 'DESC'
+])]
+#[ApiFilter(DateFilter::class, properties: [
+    'releaseDate' => DateFilter::EXCLUDE_NULL
+])]
 #[ORM\Entity(repositoryClass: GameRepository::class)]
 #[ORM\HasLifecycleCallbacks]
 class Game

@@ -61,7 +61,7 @@ class Top100GamesProvider implements ProviderInterface
                 'releaseDate' => $game->getReleaseDate() ? $game->getReleaseDate()->format('Y-m-d') : null,
                 'first_release_date' => $game->getReleaseDate() ? $game->getReleaseDate()->getTimestamp() : null,
             ];
-        }
+} 
 
         return new Top100Games($result);
     }

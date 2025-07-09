@@ -41,13 +41,80 @@ class GameRepository extends ServiceEntityRepository
     //        ;
     //    }
 
-    public function findByTitleLike(string $title): array
+    /**
+     * Recherche des jeux par titre avec recherche flexible.
+     * Cherche d'abord la phrase complète, puis les mots individuels si pas assez de résultats.
+     * 
+     * @param string $title Le titre à rechercher
+     * @param int $limit Nombre maximum de résultats (défaut: 1000)
+     * @return Game[]
+     */
+    public function findByTitleLike(string $title, int $limit = 1000): array
     {
-        return $this->createQueryBuilder('g')
-            ->where('LOWER(g.title) LIKE LOWER(:title)')
-            ->setParameter('title', '%' . $title . '%')
+        $qb = $this->createQueryBuilder('g');
+        $words = preg_split('/\s+/', trim($title));
+        $words = array_filter($words, function($word) {
+            return strlen($word) >= 3;
+        });
+        if (empty($words)) {
+            return $qb->where('LOWER(g.title) LIKE LOWER(:title)')
+                ->setParameter('title', '%' . $title . '%')
+                ->orderBy('g.totalRating', 'DESC')
+                ->addOrderBy('g.totalRatingCount', 'DESC')
+                ->setMaxResults($limit)
+                ->getQuery()
+                ->getResult();
+        }
+        // 1. Recherche exacte de la phrase complète
+        $exactResults = $qb->where('LOWER(g.title) LIKE LOWER(:exactTitle)')
+            ->setParameter('exactTitle', '%' . $title . '%')
+            ->orderBy('g.totalRating', 'DESC')
+            ->addOrderBy('g.totalRatingCount', 'DESC')
+            ->setMaxResults($limit)
             ->getQuery()
             ->getResult();
+        if (count($exactResults) >= 1) {
+            return $exactResults;
+        }
+        // 2. Recherche large avec LIKE pour tous les mots (OR)
+        $filteredWords = array_filter($words, function($word) {
+            $shortWords = ['the', 'and', 'of', 'in', 'on', 'at', 'to', 'for', 'with', 'by', 'her', 'his', 'my', 'your', 'our', 'their'];
+            return strlen($word) >= 4 && !in_array(strtolower($word), $shortWords);
+        });
+        if (empty($filteredWords)) {
+            return $exactResults;
+        }
+        $qb = $this->createQueryBuilder('g');
+        $orX = $qb->expr()->orX();
+        foreach ($filteredWords as $index => $word) {
+            $orX->add($qb->expr()->like('LOWER(g.title)', ':word' . $index));
+            $qb->setParameter('word' . $index, '%' . strtolower($word) . '%');
+        }
+        $results = $qb->where($orX)
+            ->orderBy('g.totalRating', 'DESC')
+            ->addOrderBy('g.totalRatingCount', 'DESC')
+            ->setMaxResults(2000) // Large pour filtrage PHP ensuite
+            ->getQuery()
+            ->getResult();
+        // 3. Filtrage PHP : ne garder que les jeux où chaque mot apparaît comme mot complet
+        $finalResults = [];
+        foreach ($results as $game) {
+            $titleLower = mb_strtolower($game->getTitle());
+            $allMatch = true;
+            foreach ($filteredWords as $word) {
+                if (!preg_match('/\\b' . preg_quote(mb_strtolower($word), '/') . '\\b/u', $titleLower)) {
+                    $allMatch = false;
+                    break;
+                }
+            }
+            if ($allMatch) {
+                $finalResults[] = $game;
+            }
+            if (count($finalResults) >= $limit) {
+                break;
+            }
+        }
+        return $finalResults;
     }
 
     /**
@@ -223,5 +290,101 @@ class GameRepository extends ServiceEntityRepository
         $mainTitle = preg_replace('/([:\-])\s*$/u', '', $mainTitle);
 
         return trim($mainTitle);
+    }
+
+    /**
+     * Récupère tous les genres distincts disponibles dans la base de données
+     */
+    public function getDistinctGenres(): array
+    {
+        $qb = $this->createQueryBuilder('g')
+            ->select('DISTINCT g.genres')
+            ->where('g.genres IS NOT NULL')
+            ->andWhere('g.genres != :empty')
+            ->setParameter('empty', '[]');
+
+        $results = $qb->getQuery()->getScalarResult();
+        
+        $genres = [];
+        foreach ($results as $result) {
+            $gameGenres = json_decode($result['genres'], true);
+            if (is_array($gameGenres)) {
+                $genres = array_merge($genres, $gameGenres);
+            }
+        }
+        
+        return array_unique($genres);
+    }
+
+    /**
+     * Récupère toutes les plateformes distinctes disponibles dans la base de données
+     */
+    public function getDistinctPlatforms(): array
+    {
+        $qb = $this->createQueryBuilder('g')
+            ->select('DISTINCT g.platforms')
+            ->where('g.platforms IS NOT NULL')
+            ->andWhere('g.platforms != :empty')
+            ->setParameter('empty', '[]');
+
+        $results = $qb->getQuery()->getScalarResult();
+        
+        $platforms = [];
+        foreach ($results as $result) {
+            $gamePlatforms = json_decode($result['platforms'], true);
+            if (is_array($gamePlatforms)) {
+                $platforms = array_merge($platforms, $gamePlatforms);
+            }
+        }
+        
+        return array_unique($platforms);
+    }
+
+    /**
+     * Récupère tous les modes de jeu distincts disponibles dans la base de données
+     */
+    public function getDistinctGameModes(): array
+    {
+        $qb = $this->createQueryBuilder('g')
+            ->select('DISTINCT g.gameModes')
+            ->where('g.gameModes IS NOT NULL')
+            ->andWhere('g.gameModes != :empty')
+            ->setParameter('empty', '[]');
+
+        $results = $qb->getQuery()->getScalarResult();
+        
+        $gameModes = [];
+        foreach ($results as $result) {
+            $gameGameModes = json_decode($result['gameModes'], true);
+            if (is_array($gameGameModes)) {
+                $gameModes = array_merge($gameModes, $gameGameModes);
+            }
+        }
+        
+        return array_unique($gameModes);
+    }
+
+    /**
+     * Récupère toutes les perspectives distinctes disponibles dans la base de données
+     */
+    public function getDistinctPerspectives(): array
+    {
+        $qb = $this->createQueryBuilder('g')
+            ->select('DISTINCT g.perspectives')
+            ->where('g.perspectives IS NOT NULL')
+            ->andWhere('g.perspectives != :empty')
+            ->setParameter('empty', '[]');
+
+        $results = $qb->getQuery()->getScalarResult();
+        
+        $perspectives = [];
+        foreach ($results as $result) {
+            $gamePerspectives = json_decode($result['perspectives'], true);
+            if (is_array($gamePerspectives)) {
+                $perspectives = array_merge($perspectives, $gamePerspectives);
+            }
+        }
+        
+        return array_unique($perspectives);
     }
 }

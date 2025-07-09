@@ -116,7 +116,7 @@ class ShowTop5DeduplicatedCommand extends Command
         );
 
         $io->success('✅ Top 5 dédupliqué affiché avec succès !');
-        $io->text('💡 Ces jeux sont récupérés via l\'endpoint /api/custom/games/year/top100');
+        $io->text('💡 Ces jeux sont récupérés via l\'endpoint API Platform /api/games avec filtres');
         $io->text('🔄 Pour mettre à jour : php bin/console app:import-top-year-games');
         $io->text('✨ Maintenant : Un seul jeu par nom principal !');
 

@@ -32,7 +32,7 @@ use Cocur\Slugify\Slugify;
  * - Évite les jeux comme "Pixadom" qui polluent le classement
  * 
  * 🎯 OBJECTIF :
- * Alimenter l'endpoint /api/custom/games/top100 avec des jeux de qualité
+ * Alimenter l'endpoint API Platform /api/games avec des jeux de qualité
  * 
  * ⚡ UTILISATION :
  * php bin/console app:import-top100-games
@@ -120,7 +120,7 @@ class ImportTop100GamesCommand extends Command
             ]
         );
 
-        $io->text('💡 Ces jeux alimentent l\'endpoint /api/custom/games/top100');
+        $io->text('💡 Ces jeux alimentent l\'endpoint API Platform /api/games');
         $io->text('🔄 Les slugs sont maintenant propres et uniques !');
 
         return Command::SUCCESS;

@@ -65,3 +65,7 @@ services:
             - '@event_dispatcher'
         tags:
             - { name: 'kernel.event_listener', event: 'lexik_jwt_authentication.on_authentication_success', method: 'onAuthenticationSuccess' }
+
+    # Configuration du filtre custom JsonSearchFilter
+    App\Filter\JsonSearchFilter:
+        tags: ['api_platform.filter']

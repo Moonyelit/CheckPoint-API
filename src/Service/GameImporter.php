@@ -168,7 +168,7 @@ class GameImporter
     {
         $games = $this->igdbClient->getTop100Games($minVotes, $minRating);
         $count = 0;
-        $slugMap = [];
+        $slugMap = []; // Map pour éviter les doublons de slugs dans cette importation
 
         foreach ($games as $apiGame) {
             $igdbId = $apiGame['id'];
@@ -187,7 +187,7 @@ class GameImporter
             $title = $apiGame['name'] ?? 'Inconnu';
             $game->setTitle($title);
             $baseSlug = $this->slugify->slugify($title);
-            // Générer un slug unique sans l'ID IGDB
+            // Générer un slug unique en utilisant la map pour éviter les doublons
             $uniqueSlug = $this->generateUniqueSlug($baseSlug, $game->getId(), $slugMap);
             $game->setSlug($uniqueSlug);
 
@@ -378,6 +378,9 @@ class GameImporter
         }
 
         $importedGames = [];
+        $newGames = 0;
+        $updatedGames = 0;
+        $slugMap = []; // Map pour éviter les doublons de slugs dans cette importation
 
         foreach ($apiGames as $index => $apiGame) {
             $igdbId = $apiGame['id'];
@@ -389,15 +392,17 @@ class GameImporter
                 $game = new Game();
                 $game->setIgdbId($igdbId);
                 $game->setCreatedAt(new \DateTimeImmutable());
+                $newGames++;
             } else {
+                $updatedGames++;
                 // Mise à jour jeu existant: '$title'
             }
 
             // Met à jour les informations du jeu
             $game->setTitle($title);
             $baseSlug = $this->slugify->slugify($title);
-            // Générer un slug unique sans l'ID IGDB
-            $uniqueSlug = $this->generateUniqueSlug($baseSlug, $game->getId());
+            // Générer un slug unique en utilisant la map pour éviter les doublons
+            $uniqueSlug = $this->generateUniqueSlug($baseSlug, $game->getId(), $slugMap);
             $game->setSlug($uniqueSlug);
             
             if (isset($apiGame['summary'])) {
@@ -481,7 +486,11 @@ class GameImporter
 
         try {
             $this->entityManager->flush();
+            error_log(sprintf("✅ Import IGDB réussi : %d jeux traités (%d nouveaux, %d mis à jour)", 
+                count($importedGames), $newGames, $updatedGames));
         } catch (\Exception $e) {
+            error_log(sprintf("❌ Erreur lors du flush IGDB : %s", $e->getMessage()));
+            error_log(sprintf("❌ Stack trace : %s", $e->getTraceAsString()));
             throw $e;
         }
         
@@ -597,19 +606,54 @@ class GameImporter
     {
         $slug = $baseSlug;
         $counter = 2;
+        
         // Vérifier si le slug existe déjà (en base ou dans la map mémoire)
-        while (true) {
-            $existingGame = $this->gameRepository->findOneBy(['slug' => $slug]);
-            $inMap = isset($slugMap[$slug]);
-            // Si aucun jeu avec ce slug, ou si c'est le même jeu (mise à jour)
-            if ((!$existingGame && !$inMap) || ($existingId && $existingGame && $existingGame->getId() === $existingId)) {
-                break;
-            }
+        while ($this->isSlugTaken($slug, $existingId, $slugMap)) {
             $slug = $baseSlug . '-' . $counter;
             $counter++;
+            
+            // Protection contre les boucles infinies
+            if ($counter > 1000) {
+                $slug = $baseSlug . '-' . time() . '-' . rand(1000, 9999);
+                break;
+            }
         }
-        $slugMap[$slug] = true;
+        
+        // Marquer ce slug comme utilisé dans la map
+        $slugMap[$slug] = $existingId ?? true;
         return $slug;
+    }
+
+    /**
+     * Vérifie si un slug est déjà pris (en base ou dans la map mémoire)
+     * @param string $slug Le slug à vérifier
+     * @param int|null $existingId L'ID du jeu existant (null si nouveau)
+     * @param array $slugMap La map des slugs déjà utilisés
+     * @return bool True si le slug est pris, false sinon
+     */
+    private function isSlugTaken(string $slug, ?int $existingId, array $slugMap): bool
+    {
+        // Vérifier dans la map mémoire (plus rapide)
+        if (isset($slugMap[$slug])) {
+            // Si c'est le même jeu (mise à jour), ce n'est pas un conflit
+            if ($existingId && $slugMap[$slug] === $existingId) {
+                return false;
+            }
+            return true;
+        }
+        
+        // Vérifier en base de données
+        $existingGame = $this->gameRepository->findOneBy(['slug' => $slug]);
+        if (!$existingGame) {
+            return false;
+        }
+        
+        // Si c'est le même jeu (mise à jour), ce n'est pas un conflit
+        if ($existingId && $existingGame->getId() === $existingId) {
+            return false;
+        }
+        
+        return true;
     }
 
     /**
@@ -641,5 +685,63 @@ class GameImporter
             ];
         }
         return $result;
+    }
+
+    /**
+     * Recherche des jeux IGDB sans les persister en base (plus rapide)
+     * @param string $query Le terme de recherche
+     * @return array Les jeux trouvés (non persistés)
+     */
+    public function searchGamesWithoutPersist(string $query): array
+    {
+        // Récupère les jeux depuis IGDB sans persistance
+        $apiGames = $this->igdbClient->searchAllGames($query, 1000); // Augmenté à 1000 pour récupérer le maximum de résultats
+
+        if (empty($apiGames)) {
+            return [];
+        }
+
+        $games = [];
+        $seenIgdbIds = []; // Pour éviter les doublons
+        
+        foreach ($apiGames as $apiGame) {
+            $igdbId = $apiGame['id'];
+            
+            // Éviter les doublons basés sur l'igdbId
+            if (in_array($igdbId, $seenIgdbIds)) {
+                continue;
+            }
+            
+            $seenIgdbIds[] = $igdbId;
+            
+            $games[] = [
+                'id' => null,
+                'igdbId' => $igdbId,
+                'title' => $apiGame['name'] ?? 'Inconnu',
+                'slug' => $this->slugify->slugify($apiGame['name'] ?? 'inconnu'),
+                'summary' => $apiGame['summary'] ?? null,
+                'totalRating' => $apiGame['total_rating'] ?? null,
+                'totalRatingCount' => $apiGame['total_rating_count'] ?? null,
+                'follows' => $apiGame['follows'] ?? null,
+                'releaseDate' => isset($apiGame['first_release_date']) ? 
+                    (new \DateTime())->setTimestamp($apiGame['first_release_date']) : null,
+                'developer' => isset($apiGame['involved_companies'][0]['company']['name']) ? 
+                    $apiGame['involved_companies'][0]['company']['name'] : null,
+                'platforms' => isset($apiGame['platforms']) ? 
+                    array_map(fn($p) => $p['name'], $apiGame['platforms']) : [],
+                'genres' => isset($apiGame['genres']) ? 
+                    array_map(fn($g) => $g['name'], $apiGame['genres']) : [],
+                'gameModes' => isset($apiGame['game_modes']) ? 
+                    array_map(fn($m) => $m['name'], $apiGame['game_modes']) : [],
+                'perspectives' => isset($apiGame['player_perspectives']) ? 
+                    array_map(fn($p) => $p['name'], $apiGame['player_perspectives']) : [],
+                'coverUrl' => isset($apiGame['cover']['url']) ? 
+                    $this->igdbClient->improveImageQuality($apiGame['cover']['url'], 't_cover_big') : null,
+                'category' => $apiGame['category'] ?? null,
+                'isPersisted' => false // Flag pour indiquer que ce jeu n'est pas en base
+            ];
+        }
+
+        return $games;
     }
 }
