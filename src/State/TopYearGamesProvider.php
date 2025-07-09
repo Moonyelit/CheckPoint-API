@@ -22,7 +22,7 @@ class TopYearGamesProvider implements ProviderInterface
             $limit = (int) $_GET['limit'];
         }
 
-        $games = $this->gameRepository->findTopYearGamesDeduplicated($limit, 80, 80);
+        $games = $this->gameRepository->findTopYearGamesDeduplicated($limit, 70, 50);
 
         $result = [];
         foreach ($games as $game) {

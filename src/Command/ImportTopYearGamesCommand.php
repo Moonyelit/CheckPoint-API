@@ -96,7 +96,7 @@ class ImportTopYearGamesCommand extends Command
             
             // Import général des jeux de l'année
             $io->section('📥 Import général des jeux de l\'année');
-            $importedCount = $this->gameImporter->importTopYearGames(50, 80); // Votes ≥50, Note ≥8.0/10
+            $importedCount = $this->gameImporter->importTopYearGames(80, 80); // Votes ≥70, Note ≥8.0/10
             
             $io->success("✅ Import terminé ! {$importedPriority} jeux prioritaires + {$importedCount} jeux de l'année traités.");
             $io->text('💡 Ces jeux alimentent l\'endpoint /api/games/top100-year');

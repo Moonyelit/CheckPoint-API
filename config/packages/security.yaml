@@ -23,8 +23,6 @@ security:
                 password_path: password
                 success_handler: App\Security\AuthenticationSuccessHandler
                 failure_handler: App\Security\CustomAuthenticationFailureHandler
-            login_throttling:
-                limiter: App\Security\LoginRateLimiter
 
         api:
             pattern: ^/api

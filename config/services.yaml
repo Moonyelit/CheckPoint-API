@@ -30,14 +30,6 @@ services:
             $clientId: '%igdb.client_id%'
             $clientSecret: '%igdb.client_secret%'
 
-    # Une seule configuration du LoginController
-    App\Controller\LoginController: ~
-
-    # Configuration pour le LoginRateLimiter
-    App\Security\LoginRateLimiter:
-        arguments:
-            $factory: '@limiter.login_limiter'
-
     # Configuration du CustomAuthenticationFailureHandler
     App\Security\CustomAuthenticationFailureHandler:
         autowire: true
