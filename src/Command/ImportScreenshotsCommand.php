@@ -55,25 +55,16 @@ class ImportScreenshotsCommand extends Command
             try {
                 $io->text(sprintf('Traitement de "%s" (IGDB ID: %d)...', $game->getTitle(), $game->getIgdbId()));
 
-                // Récupère les données du jeu depuis IGDB
-                $apiGames = $this->igdbClient->searchGames($game->getTitle(), 1);
+                // Utilise directement l'ID IGDB stocké pour récupérer les données
+                $apiGame = $this->igdbClient->getGameDetails($game->getIgdbId());
                 
-                if (empty($apiGames)) {
-                    $io->warning(sprintf('Aucune donnée IGDB trouvée pour "%s"', $game->getTitle()));
-                    continue;
-                }
-
-                $apiGame = $apiGames[0];
-
-                // Vérifie si le jeu IGDB correspond (même ID)
-                if ($apiGame['id'] !== $game->getIgdbId()) {
-                    $io->warning(sprintf('ID IGDB différent pour "%s" (local: %d, IGDB: %d)', 
-                        $game->getTitle(), $game->getIgdbId(), $apiGame['id']));
+                if (!$apiGame) {
+                    $io->warning(sprintf('Aucune donnée IGDB trouvée pour l\'ID %d ("%s")', $game->getIgdbId(), $game->getTitle()));
                     continue;
                 }
 
                 // Importe les screenshots
-                if (isset($apiGame['screenshots']) && is_array($apiGame['screenshots'])) {
+                if (isset($apiGame['screenshots']) && is_array($apiGame['screenshots']) && !empty($apiGame['screenshots'])) {
                     $screenshotData = $this->igdbClient->getScreenshots($apiGame['screenshots']);
                     
                     foreach ($screenshotData as $data) {
@@ -85,10 +76,6 @@ class ImportScreenshotsCommand extends Command
 
                     $this->entityManager->persist($game);
                     $importedCount++;
-
-                    $io->text(sprintf('  ✅ %d screenshots importés', count($screenshotData)));
-                } else {
-                    $io->text('  ⚠️ Aucun screenshot disponible');
                 }
 
                 // Pause pour éviter de surcharger l'API IGDB

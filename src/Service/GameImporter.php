@@ -67,6 +67,14 @@ class GameImporter
         $this->slugify = new Slugify();
     }
 
+    /**
+     * Retourne l'instance IgdbClient pour utilisation externe
+     */
+    public function getIgdbClient(): IgdbClient
+    {
+        return $this->igdbClient;
+    }
+
     public function importPopularGames(): void
     {
         // Récupère les jeux populaires depuis l'API IGDB
@@ -130,6 +138,28 @@ class GameImporter
                 $game->setDeveloper($apiGame['involved_companies'][0]['company']['name']);
             }
 
+            // Parser l'éditeur depuis involved_companies
+            if (isset($apiGame['involved_companies'])) {
+                foreach ($apiGame['involved_companies'] as $company) {
+                    if (isset($company['publisher']) && $company['publisher'] && isset($company['company']['name'])) {
+                        $game->setPublisher($company['company']['name']);
+                        break;
+                    }
+                }
+            }
+
+            // Parser les titres alternatifs
+            if (isset($apiGame['alternative_names'])) {
+                $alternativeTitles = array_map(fn($alt) => $alt['name'], $apiGame['alternative_names']);
+                $game->setAlternativeTitles($alternativeTitles);
+            }
+
+            // Parser la classification d'âge
+            if (isset($apiGame['age_ratings']) && !empty($apiGame['age_ratings'])) {
+                // Pour l'instant, on stocke juste le premier ID, on pourra l'enrichir plus tard
+                $game->setAgeRating(implode(',', $apiGame['age_ratings']));
+            }
+
             if (isset($apiGame['cover']['url'])) {
                 $imageUrl = $apiGame['cover']['url'];
                 if (strpos($imageUrl, '//') === 0) {
@@ -139,14 +169,24 @@ class GameImporter
                 $game->setCoverUrl($highQualityUrl);
             }
 
+            // Compter les médias disponibles
+            if (isset($apiGame['screenshots'])) {
+                $game->setScreenshotsCount(count($apiGame['screenshots']));
+            }
+            if (isset($apiGame['artworks'])) {
+                $game->setArtworksCount(count($apiGame['artworks']));
+            }
+            if (isset($apiGame['videos'])) {
+                $game->setVideosCount(count($apiGame['videos']));
+            }
+
             // Ajout des statistiques de rating et popularité
             if (array_key_exists('total_rating_count', $apiGame)) {
                 $game->setTotalRatingCount($apiGame['total_rating_count']);
             }
-            if (array_key_exists('follows', $apiGame)) {
-                $game->setFollows($apiGame['follows']);
+            if (array_key_exists('updated_at', $apiGame)) {
+                $game->setLastPopularityUpdate((new \DateTimeImmutable())->setTimestamp($apiGame['updated_at']));
             }
-            $game->setLastPopularityUpdate(new \DateTimeImmutable());
 
             // Sauvegarde la catégorie (taxonomie du jeu)
             if (array_key_exists('category', $apiGame)) {
@@ -170,11 +210,40 @@ class GameImporter
         $count = 0;
         $slugMap = []; // Map pour éviter les doublons de slugs dans cette importation
 
+        // Collecter tous les IDs de vidéos pour l'hydratation
+        $allVideoIds = [];
+        // Collecter tous les IDs d'artworks pour l'hydratation
+        $allArtworkIds = [];
+        foreach ($games as $apiGame) {
+            if (isset($apiGame['videos'])) {
+                $allVideoIds = array_merge($allVideoIds, $apiGame['videos']);
+            }
+            if (isset($apiGame['artworks'])) {
+                $allArtworkIds = array_merge($allArtworkIds, $apiGame['artworks']);
+            }
+        }
+
+        // Hydrater les vidéos
+        $videosData = $this->igdbClient->getVideos($allVideoIds);
+        // Hydrater les artworks
+        $artworksData = $this->igdbClient->getArtworks($allArtworkIds);
+
+        // Créer des maps pour un accès rapide
+        $videosMap = [];
+        foreach ($videosData as $video) {
+            $videosMap[$video['id']] = $video;
+        }
+        $artworksMap = [];
+        foreach ($artworksData as $artwork) {
+            $artworksMap[$artwork['id']] = $artwork;
+        }
+
         foreach ($games as $apiGame) {
             $igdbId = $apiGame['id'];
 
-            // Vérifie si le jeu existe déjà
+            // Vérifie si le jeu existe déjà en base
             $existingGame = $this->gameRepository->findOneBy(['igdbId' => $igdbId]);
+
             if (!$existingGame) {
                 $game = new Game();
                 $game->setIgdbId($igdbId);
@@ -226,6 +295,102 @@ class GameImporter
             if (isset($apiGame['involved_companies'][0]['company']['name'])) {
                 $game->setDeveloper($apiGame['involved_companies'][0]['company']['name']);
             }
+
+            // Récupérer l'éditeur (publisher) - différent du développeur
+            if (isset($apiGame['involved_companies'])) {
+                foreach ($apiGame['involved_companies'] as $company) {
+                    if (isset($company['company']['name']) && isset($company['publisher']) && $company['publisher']) {
+                        $game->setPublisher($company['company']['name']);
+                        break;
+                    }
+                }
+            }
+
+            // Récupérer les titres alternatifs
+            if (isset($apiGame['alternative_names'])) {
+                $alternativeTitles = array_map(fn($alt) => $alt['name'], $apiGame['alternative_names']);
+                $game->setAlternativeTitles($alternativeTitles);
+            }
+
+            // Récupérer les dates de sortie par plateforme
+            if (isset($apiGame['release_dates'])) {
+                $releaseDatesByPlatform = [];
+                foreach ($apiGame['release_dates'] as $release) {
+                    if (isset($release['platform']['name']) && isset($release['date'])) {
+                        $platformName = $release['platform']['name'];
+                        $releaseDate = date('Y-m-d', $release['date']);
+                        $releaseDatesByPlatform[$platformName] = $releaseDate;
+                    }
+                }
+                if (!empty($releaseDatesByPlatform)) {
+                    // Suppression de cette ligne qui cause l'erreur
+                    // $game->setReleaseDatesByPlatform($releaseDatesByPlatform);
+                }
+            }
+
+            // Récupérer la classification par âge
+            if (isset($apiGame['age_ratings'])) {
+                foreach ($apiGame['age_ratings'] as $rating) {
+                    if (isset($rating['rating']['name'])) {
+                        $game->setAgeRating($rating['rating']['name']);
+                        break;
+                    }
+                }
+            }
+
+            // NOUVELLE LOGIQUE : Récupérer et enregistrer uniquement le PEGI
+            $pegi = null;
+            $ageRatings = $this->igdbClient->getAgeRatings([$igdbId]);
+            if (isset($ageRatings[$igdbId])) {
+                foreach ($ageRatings[$igdbId] as $label) {
+                    if (strpos($label, 'PEGI') !== false) {
+                        $pegi = $label;
+                        break;
+                    }
+                }
+            }
+            $game->setAgeRating($pegi);
+
+            // Traiter les vidéos
+            if (isset($apiGame['videos'])) {
+                foreach ($apiGame['videos'] as $videoId) {
+                    if (isset($videosMap[$videoId])) {
+                        $videoData = $videosMap[$videoId];
+                        
+                        $videoEntity = new \App\Entity\Video();
+                        $videoEntity->setName($videoData['name'] ?? 'Trailer');
+                        $videoEntity->setVideoId($videoData['video_id']);
+                        $videoEntity->setUrl($videoData['url']);
+                        $videoEntity->setGame($game);
+                        
+                        $game->addVideo($videoEntity);
+                        $this->entityManager->persist($videoEntity);
+                    }
+                }
+            }
+
+            // Traiter les artworks
+            if (isset($apiGame['artworks'])) {
+                foreach ($apiGame['artworks'] as $artworkId) {
+                    if (isset($artworksMap[$artworkId])) {
+                        $artworkData = $artworksMap[$artworkId];
+                        
+                        $artworkEntity = new \App\Entity\Artwork();
+                        $artworkEntity->setTitle($artworkData['name'] ?? 'Artwork');
+                        $artworkEntity->setUrl($artworkData['url']);
+                        $artworkEntity->setType('artwork');
+                        $artworkEntity->setGame($game);
+                        
+                        $game->addArtwork($artworkEntity);
+                        $this->entityManager->persist($artworkEntity);
+                    }
+                }
+            }
+
+            // Calculer les compteurs de médias
+            $game->setScreenshotsCount($game->getScreenshots()->count());
+            $game->setArtworksCount($game->getArtworks()->count());
+            $game->setVideosCount($game->getVideos()->count());
 
             if (isset($apiGame['cover']['url'])) {
                 $imageUrl = $apiGame['cover']['url'];
@@ -335,6 +500,75 @@ class GameImporter
 
         if (isset($apiGame['involved_companies'][0]['company']['name'])) {
             $game->setDeveloper($apiGame['involved_companies'][0]['company']['name']);
+        }
+
+        // Récupérer l'éditeur (publisher) - différent du développeur
+        if (isset($apiGame['involved_companies'])) {
+            foreach ($apiGame['involved_companies'] as $company) {
+                if (isset($company['company']['name']) && isset($company['publisher']) && $company['publisher']) {
+                    $game->setPublisher($company['company']['name']);
+                    break;
+                }
+            }
+        }
+
+        // Récupérer les titres alternatifs
+        if (isset($apiGame['alternative_names'])) {
+            $alternativeTitles = array_map(fn($alt) => $alt['name'], $apiGame['alternative_names']);
+            $game->setAlternativeTitles($alternativeTitles);
+        }
+
+        // Récupérer les dates de sortie par plateforme
+        if (isset($apiGame['release_dates'])) {
+            $releaseDatesByPlatform = [];
+            foreach ($apiGame['release_dates'] as $release) {
+                if (isset($release['platform']['name']) && isset($release['date'])) {
+                    $platformName = $release['platform']['name'];
+                    $releaseDate = date('Y-m-d', $release['date']);
+                    $releaseDatesByPlatform[$platformName] = $releaseDate;
+                }
+            }
+            if (!empty($releaseDatesByPlatform)) {
+                // Suppression de cette ligne qui cause l'erreur
+                // $game->setReleaseDatesByPlatform($releaseDatesByPlatform);
+            }
+        }
+
+        // Récupérer la classification par âge
+        if (isset($apiGame['age_ratings'])) {
+            foreach ($apiGame['age_ratings'] as $rating) {
+                if (isset($rating['rating']['name'])) {
+                    $game->setAgeRating($rating['rating']['name']);
+                    break;
+                }
+            }
+        }
+
+        // Récupérer le lien du trailer
+        if (isset($apiGame['videos'])) {
+            foreach ($apiGame['videos'] as $video) {
+                if (isset($video['video_id'])) {
+                    $game->setTrailerUrl("https://www.youtube.com/watch?v=" . $video['video_id']);
+                    break;
+                }
+            }
+        }
+
+        // Récupérer les vidéos
+        if (isset($apiGame['videos'])) {
+            foreach ($apiGame['videos'] as $video) {
+                if (isset($video['video_id'])) {
+                    // Créer une entité Video
+                    $videoEntity = new \App\Entity\Video();
+                    $videoEntity->setName($video['name'] ?? 'Trailer');
+                    $videoEntity->setVideoId($video['video_id']);
+                    $videoEntity->setUrl("https://www.youtube.com/watch?v=" . $video['video_id']);
+                    $videoEntity->setGame($game);
+                    
+                    $game->addVideo($videoEntity);
+                    $this->entityManager->persist($videoEntity);
+                }
+            }
         }
 
         if (isset($apiGame['cover']['url'])) {
@@ -486,11 +720,7 @@ class GameImporter
 
         try {
             $this->entityManager->flush();
-            error_log(sprintf("✅ Import IGDB réussi : %d jeux traités (%d nouveaux, %d mis à jour)", 
-                count($importedGames), $newGames, $updatedGames));
         } catch (\Exception $e) {
-            error_log(sprintf("❌ Erreur lors du flush IGDB : %s", $e->getMessage()));
-            error_log(sprintf("❌ Stack trace : %s", $e->getTraceAsString()));
             throw $e;
         }
         
@@ -504,6 +734,34 @@ class GameImporter
     {
         $games = $this->igdbClient->getTopYearGames($minVotes, $minRating);
         $count = 0;
+
+        // Collecter tous les IDs de vidéos pour l'hydratation
+        $allVideoIds = [];
+        // Collecter tous les IDs d'artworks pour l'hydratation
+        $allArtworkIds = [];
+        foreach ($games as $apiGame) {
+            if (isset($apiGame['videos'])) {
+                $allVideoIds = array_merge($allVideoIds, $apiGame['videos']);
+            }
+            if (isset($apiGame['artworks'])) {
+                $allArtworkIds = array_merge($allArtworkIds, $apiGame['artworks']);
+            }
+        }
+
+        // Hydrater les vidéos
+        $videosData = $this->igdbClient->getVideos($allVideoIds);
+        // Hydrater les artworks
+        $artworksData = $this->igdbClient->getArtworks($allArtworkIds);
+
+        // Créer des maps pour un accès rapide
+        $videosMap = [];
+        foreach ($videosData as $video) {
+            $videosMap[$video['id']] = $video;
+        }
+        $artworksMap = [];
+        foreach ($artworksData as $artwork) {
+            $artworksMap[$artwork['id']] = $artwork;
+        }
 
         foreach ($games as $apiGame) {
             $igdbId = $apiGame['id'];
@@ -561,6 +819,87 @@ class GameImporter
             if (isset($apiGame['involved_companies'][0]['company']['name'])) {
                 $game->setDeveloper($apiGame['involved_companies'][0]['company']['name']);
             }
+
+            // Récupérer l'éditeur (publisher) - différent du développeur
+            if (isset($apiGame['involved_companies'])) {
+                foreach ($apiGame['involved_companies'] as $company) {
+                    if (isset($company['company']['name']) && isset($company['publisher']) && $company['publisher']) {
+                        $game->setPublisher($company['company']['name']);
+                        break;
+                    }
+                }
+            }
+
+            // Traiter les nouvelles données enrichies
+            if (isset($apiGame['alternative_names'])) {
+                $alternativeTitles = array_map(fn($alt) => $alt['name'], $apiGame['alternative_names']);
+                $game->setAlternativeTitles($alternativeTitles);
+            }
+
+            if (isset($apiGame['release_dates'])) {
+                $releaseDatesByPlatform = [];
+                foreach ($apiGame['release_dates'] as $release) {
+                    if (isset($release['platform']['name']) && isset($release['date'])) {
+                        $platformName = $release['platform']['name'];
+                        $releaseDate = date('Y-m-d', $release['date']);
+                        $releaseDatesByPlatform[$platformName] = $releaseDate;
+                    }
+                }
+                // Suppression de cette ligne qui cause l'erreur
+                // if (!empty($releaseDatesByPlatform)) {
+                //     $game->setReleaseDatesByPlatform($releaseDatesByPlatform);
+                // }
+            }
+
+            if (isset($apiGame['age_ratings'])) {
+                foreach ($apiGame['age_ratings'] as $rating) {
+                    if (isset($rating['rating']['name'])) {
+                        $game->setAgeRating($rating['rating']['name']);
+                        break;
+                    }
+                }
+            }
+
+            // Traiter les vidéos
+            if (isset($apiGame['videos'])) {
+                foreach ($apiGame['videos'] as $videoId) {
+                    if (isset($videosMap[$videoId])) {
+                        $videoData = $videosMap[$videoId];
+                        
+                        $videoEntity = new \App\Entity\Video();
+                        $videoEntity->setName($videoData['name'] ?? 'Trailer');
+                        $videoEntity->setVideoId($videoData['video_id']);
+                        $videoEntity->setUrl($videoData['url']);
+                        $videoEntity->setGame($game);
+                        
+                        $game->addVideo($videoEntity);
+                        $this->entityManager->persist($videoEntity);
+                    }
+                }
+            }
+
+            // Traiter les artworks
+            if (isset($apiGame['artworks'])) {
+                foreach ($apiGame['artworks'] as $artworkId) {
+                    if (isset($artworksMap[$artworkId])) {
+                        $artworkData = $artworksMap[$artworkId];
+                        
+                        $artworkEntity = new \App\Entity\Artwork();
+                        $artworkEntity->setTitle($artworkData['name'] ?? 'Artwork');
+                        $artworkEntity->setUrl($artworkData['url']);
+                        $artworkEntity->setType('artwork');
+                        $artworkEntity->setGame($game);
+                        
+                        $game->addArtwork($artworkEntity);
+                        $this->entityManager->persist($artworkEntity);
+                    }
+                }
+            }
+
+            // Calculer les compteurs de médias
+            $game->setScreenshotsCount($game->getScreenshots()->count());
+            $game->setArtworksCount($game->getArtworks()->count());
+            $game->setVideosCount($game->getVideos()->count());
 
             if (isset($apiGame['cover']['url'])) {
                 $imageUrl = $apiGame['cover']['url'];
@@ -714,7 +1053,7 @@ class GameImporter
             
             $seenIgdbIds[] = $igdbId;
             
-            $games[] = [
+            $game = [
                 'id' => null,
                 'igdbId' => $igdbId,
                 'title' => $apiGame['name'] ?? 'Inconnu',
@@ -724,7 +1063,7 @@ class GameImporter
                 'totalRatingCount' => $apiGame['total_rating_count'] ?? null,
                 'follows' => $apiGame['follows'] ?? null,
                 'releaseDate' => isset($apiGame['first_release_date']) ? 
-                    (new \DateTime())->setTimestamp($apiGame['first_release_date']) : null,
+                    (new \DateTime())->setTimestamp($apiGame['first_release_date'])->format('Y-m-d') : null,
                 'developer' => isset($apiGame['involved_companies'][0]['company']['name']) ? 
                     $apiGame['involved_companies'][0]['company']['name'] : null,
                 'platforms' => isset($apiGame['platforms']) ? 
@@ -740,6 +1079,19 @@ class GameImporter
                 'category' => $apiGame['category'] ?? null,
                 'isPersisted' => false // Flag pour indiquer que ce jeu n'est pas en base
             ];
+
+            // Nettoyage : forcer tous les champs à être scalaires ou array (jamais objet)
+            foreach ($game as $key => $value) {
+                if ($value instanceof \DateTimeInterface) {
+                    $game[$key] = $value->format('Y-m-d');
+                } elseif (is_object($value)) {
+                    $game[$key] = (string)$value;
+                } elseif (is_resource($value)) {
+                    unset($game[$key]);
+                }
+            }
+
+            $games[] = $game;
         }
 
         return $games;

@@ -3,6 +3,7 @@
 namespace App\Service;
 
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Psr\Log\LoggerInterface;
 
 /**
  * 🎮 SERVICE IGDB CLIENT - INTERFACE AVANCÉE AVEC L'API IGDB
@@ -52,6 +53,7 @@ class IgdbClient
     private string $clientSecret;
     private ?string $accessToken = null;
     private ?int $tokenTimestamp = null;
+    private LoggerInterface $logger;
     
     // Cache simple pour les résultats de comptage
     private array $countCache = [];
@@ -64,12 +66,14 @@ class IgdbClient
      * @param HttpClientInterface $client       Le client HTTP pour effectuer les requêtes.
      * @param string              $clientId     L'identifiant client pour l'API IGDB.
      * @param string              $clientSecret Le secret client pour l'API IGDB.
+     * @param LoggerInterface     $logger       Le logger pour les messages de debug.
      */
-    public function __construct(HttpClientInterface $client, string $clientId, string $clientSecret)
+    public function __construct(HttpClientInterface $client, string $clientId, string $clientSecret, LoggerInterface $logger)
     {
         $this->client = $client;
         $this->clientId = $clientId;
         $this->clientSecret = $clientSecret;
+        $this->logger = $logger;
     }
 
     /**
@@ -80,7 +84,7 @@ class IgdbClient
      *
      * @return string Le token d'accès valide.
      */
-    private function getAccessToken(): string
+    public function getAccessToken(): string
     {
         // Vérifie si le token actuel est encore valide
         if ($this->accessToken && (time() - $this->tokenTimestamp < 3600)) {
@@ -105,6 +109,14 @@ class IgdbClient
         return $this->accessToken;
     }
 
+    private function cleanBody(string $body): string
+    {
+        // Supprime les espaces/tabs en début de chaque ligne et les lignes vides
+        $lines = explode("\n", $body);
+        $cleaned = array_map(fn($l) => ltrim($l), $lines);
+        return implode("\n", array_filter($cleaned, fn($l) => trim($l) !== ''));
+    }
+
     /**
      * Recherche des jeux dans l'API IGDB en fonction d'un mot-clé.
      *
@@ -113,26 +125,23 @@ class IgdbClient
      * @param int $offset L'offset pour la pagination
      * @return array La liste des jeux correspondant à la recherche.
      */
-    public function searchGames(string $search, int $limit = 20, int $offset = 0): array
+    public function searchGames(string $search, int $limit = 50, int $offset = 0): array
     {
-        error_log("🔍 Début searchGames IGDB pour: '$search' (limit: $limit, offset: $offset)");
-        
         try {
             $accessToken = $this->getAccessToken();
-            error_log("🔑 Token d'accès IGDB récupéré avec succès");
         } catch (\Exception $e) {
-            error_log("❌ Erreur lors de la récupération du token IGDB: " . $e->getMessage());
+            $this->logger->error("❌ Erreur lors de la récupération du token IGDB: " . $e->getMessage());
             throw $e;
         }
 
+        // REQUÊTE CORRIGÉE : Suppression des champs problématiques et simplification
         $requestBody = <<<EOT
-            fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots, total_rating, total_rating_count, follows, involved_companies.company.name, category;
-            search "$search";
-            limit $limit;
-            offset $offset;
-        EOT;
-        
-        error_log("📤 Requête IGDB envoyée: " . str_replace("\n", " ", $requestBody));
+fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots, artworks, total_rating, total_rating_count, involved_companies.company.name, involved_companies.publisher, category, alternative_names.name, release_dates.platform.name, release_dates.date, videos, age_ratings;
+search "$search";
+limit $limit;
+offset $offset;
+EOT;
+        $requestBody = $this->cleanBody($requestBody);
 
         try {
             // Effectue une requête POST pour rechercher des jeux
@@ -144,15 +153,11 @@ class IgdbClient
                 ],
                 'body' => $requestBody
             ]);
-
-            error_log("📡 Réponse IGDB reçue, statut: " . $response->getStatusCode());
             
             $games = $response->toArray();
-            error_log("📊 Réponse IGDB parsée: " . count($games) . " jeux trouvés");
             
         } catch (\Exception $e) {
-            error_log("❌ Erreur lors de la requête IGDB pour '$search': " . $e->getMessage());
-            error_log("❌ Détails de l'erreur: " . $e->getTraceAsString());
+            $this->logger->error("❌ Erreur lors de la requête IGDB pour '$search': " . $e->getMessage());
             throw $e;
         }
         
@@ -168,7 +173,6 @@ class IgdbClient
             }
         }
 
-        error_log("✅ searchGames IGDB terminé pour '$search': " . count($games) . " jeux retournés");
         // Retourne les résultats sous forme de tableau
         return $games;
     }
@@ -182,8 +186,6 @@ class IgdbClient
      */
     public function searchAllGames(string $search, int $maxResults = 500): array
     {
-        error_log("🔍 Début searchAllGames IGDB pour: '$search' (max: $maxResults)");
-        
         $allGames = [];
         $offset = 0;
         $limit = 50; // Limite par requête pour éviter les timeouts
@@ -193,14 +195,11 @@ class IgdbClient
                 $games = $this->searchGames($search, $limit, $offset);
                 
                 if (empty($games)) {
-                    error_log("📊 Plus de jeux trouvés pour '$search', arrêt de la pagination");
                     break; // Plus de résultats disponibles
                 }
                 
                 $allGames = array_merge($allGames, $games);
                 $offset += $limit;
-                
-                error_log("📊 Récupéré " . count($games) . " jeux (total: " . count($allGames) . ")");
                 
                 // Si on a moins de jeux que la limite, c'est qu'on a atteint la fin
                 if (count($games) < $limit) {
@@ -211,12 +210,11 @@ class IgdbClient
                 usleep(100000); // 100ms
                 
             } catch (\Exception $e) {
-                error_log("❌ Erreur lors de la pagination pour '$search': " . $e->getMessage());
+                $this->logger->error("❌ Erreur lors de la pagination pour '$search': " . $e->getMessage());
                 break;
             }
         }
         
-        error_log("✅ searchAllGames IGDB terminé pour '$search': " . count($allGames) . " jeux au total");
         return $allGames;
     }
 
@@ -239,16 +237,18 @@ class IgdbClient
         $idsString = implode(',', $ids);
 
         // Effectue une requête POST pour récupérer les captures d'écran
+        $requestBody = <<<EOT
+fields url;
+where id = ($idsString);
+EOT;
+        $requestBody = $this->cleanBody($requestBody);
         $response = $this->client->request('POST', 'https://api.igdb.com/v4/screenshots', [
             'headers' => [
                 'Client-ID' => $this->clientId,
                 'Authorization' => 'Bearer ' . $accessToken,
                 'Content-Type' => 'text/plain',
             ],
-            'body' => <<<EOT
-            fields url;
-            where id = ($idsString);
-        EOT
+            'body' => $requestBody
         ]);
 
         $screenshots = $response->toArray();
@@ -279,24 +279,39 @@ class IgdbClient
      */
     public function getPopularGames(): array
     {
-        $accessToken = $this->getAccessToken();
+        try {
+            $accessToken = $this->getAccessToken();
+        } catch (\Exception $e) {
+            $this->logger->error("❌ Erreur lors de la récupération du token IGDB: " . $e->getMessage());
+            throw $e;
+        }
 
-        // Effectue une requête POST pour récupérer les jeux populaires
-        $response = $this->client->request('POST', 'https://api.igdb.com/v4/games', [
-            'headers' => [
-                'Client-ID' => $this->clientId,
-                'Authorization' => 'Bearer ' . $accessToken,
-                'Content-Type' => 'text/plain',
-            ],
-            'body' => <<<EOT
-            fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots, total_rating, involved_companies.company.name, category;
-            sort total_rating desc;
-            where total_rating != null;
-            limit 500;
-            EOT
-        ]);
-
-        $games = $response->toArray();
+        // REQUÊTE CORRIGÉE : Suppression des champs problématiques
+        $requestBody = <<<EOT
+fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots, total_rating, involved_companies.company.name, involved_companies.publisher, category, videos, alternative_names.name, release_dates.platform.name, release_dates.date, age_ratings;
+sort total_rating desc;
+where total_rating != null;
+limit 500;
+EOT;
+        $requestBody = $this->cleanBody($requestBody);
+        
+        try {
+            // Effectue une requête POST pour récupérer les jeux populaires
+            $response = $this->client->request('POST', 'https://api.igdb.com/v4/games', [
+                'headers' => [
+                    'Client-ID' => $this->clientId,
+                    'Authorization' => 'Bearer ' . $accessToken,
+                    'Content-Type' => 'text/plain',
+                ],
+                'body' => $requestBody
+            ]);
+            
+            $games = $response->toArray();
+            
+        } catch (\Exception $e) {
+            $this->logger->error("❌ Erreur lors de la requête IGDB pour les jeux populaires: " . $e->getMessage());
+            throw $e;
+        }
         
         // Améliore la qualité des images de couverture
         foreach ($games as &$game) {
@@ -319,34 +334,48 @@ class IgdbClient
      */
     public function getTop100Games(int $minVotes = 80, int $minRating = 75): array
     {
-        $accessToken = $this->getAccessToken();
+        try {
+            $accessToken = $this->getAccessToken();
+        } catch (\Exception $e) {
+            $this->logger->error("❌ Erreur lors de la récupération du token IGDB: " . $e->getMessage());
+            throw $e;
+        }
+        
         $minVotes = (int)$minVotes;
         $minRating = (int)$minRating;
-        $response = $this->client->request('POST', 'https://api.igdb.com/v4/games', [
-            'headers' => [
-                'Client-ID' => $this->clientId,
-                'Authorization' => 'Bearer ' . $accessToken,
-                'Content-Type' => 'text/plain',
-            ],
-            'body' => <<<EOT
-fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots, total_rating, total_rating_count, involved_companies.company.name, category;
+        
+        // REQUÊTE CORRIGÉE : Suppression des champs problématiques
+        $requestBody = <<<EOT
+fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots, artworks, total_rating, total_rating_count, involved_companies.company.name, involved_companies.publisher, category, alternative_names.name, videos, age_ratings;
 sort total_rating desc;
-where total_rating != null & total_rating_count >= $minVotes & total_rating >= $minRating;
+where total_rating != null & total_rating_count >= $minVotes;
 limit 100;
-EOT
-        ]);
-        $games = $response->toArray();
-        foreach ($games as &$game) {
-            if (isset($game['cover']['url'])) {
-                // S'assurer que l'URL a le bon format
-                $imageUrl = $game['cover']['url'];
-                if (strpos($imageUrl, '//') === 0) {
-                    $imageUrl = 'https:' . $imageUrl;
-                }
-                $game['cover']['url'] = $this->improveImageQuality($imageUrl, 't_cover_big');
-            }
+EOT;
+        $requestBody = $this->cleanBody($requestBody);
+        
+        try {
+            $response = $this->client->request('POST', 'https://api.igdb.com/v4/games', [
+                'headers' => [
+                    'Client-ID' => $this->clientId,
+                    'Authorization' => 'Bearer ' . $accessToken,
+                    'Content-Type' => 'text/plain',
+                ],
+                'body' => $requestBody
+            ]);
+            
+            $games = $response->toArray();
+            
+        } catch (\Exception $e) {
+            $this->logger->error("❌ Erreur lors de la requête IGDB pour le Top 100: " . $e->getMessage());
+            throw $e;
         }
-        return $games;
+        
+        // Filtrer par note minimum côté PHP
+        $filteredGames = array_filter($games, function($game) use ($minRating) {
+            return isset($game['total_rating']) && $game['total_rating'] >= $minRating;
+        });
+        
+        return $filteredGames;
     }
 
     /**
@@ -355,24 +384,43 @@ EOT
      */
     public function getTopYearGames(int $minVotes = 50, int $minRating = 80): array
     {
-        $accessToken = $this->getAccessToken();
+        try {
+            $accessToken = $this->getAccessToken();
+        } catch (\Exception $e) {
+            $this->logger->error("❌ Erreur lors de la récupération du token IGDB: " . $e->getMessage());
+            throw $e;
+        }
+        
         $minVotes = (int)$minVotes;
         $minRating = (int)$minRating;
         $oneYearAgo = (new \DateTimeImmutable('-365 days'))->getTimestamp();
-        $response = $this->client->request('POST', 'https://api.igdb.com/v4/games', [
-            'headers' => [
-                'Client-ID' => $this->clientId,
-                'Authorization' => 'Bearer ' . $accessToken,
-                'Content-Type' => 'text/plain',
-            ],
-            'body' => <<<EOT
-fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots, total_rating, total_rating_count, involved_companies.company.name, category;
+        
+        // REQUÊTE CORRIGÉE : Suppression des champs problématiques
+        $requestBody = <<<EOT
+fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots, artworks, total_rating, total_rating_count, involved_companies.company.name, category, alternative_names.name, release_dates.platform.name, release_dates.date, videos, age_ratings;
 sort total_rating desc;
-where total_rating != null;
+where total_rating != null & first_release_date >= $oneYearAgo & total_rating_count >= $minVotes & total_rating >= $minRating;
 limit 50;
-EOT
-        ]);
-        $games = $response->toArray();
+EOT;
+        $requestBody = $this->cleanBody($requestBody);
+        
+        try {
+            $response = $this->client->request('POST', 'https://api.igdb.com/v4/games', [
+                'headers' => [
+                    'Client-ID' => $this->clientId,
+                    'Authorization' => 'Bearer ' . $accessToken,
+                    'Content-Type' => 'text/plain',
+                ],
+                'body' => $requestBody
+            ]);
+            
+            $games = $response->toArray();
+            
+        } catch (\Exception $e) {
+            $this->logger->error("❌ Erreur lors de la requête IGDB pour les jeux récents: " . $e->getMessage());
+            throw $e;
+        }
+        
         foreach ($games as &$game) {
             if (isset($game['cover']['url'])) {
                 $imageUrl = $game['cover']['url'];
@@ -382,6 +430,7 @@ EOT
                 $game['cover']['url'] = $this->improveImageQuality($imageUrl, 't_cover_big');
             }
         }
+        
         return $games;
     }
 
@@ -396,8 +445,21 @@ EOT
      */
     public function getGameDetails(int $gameId): ?array
     {
-        $accessToken = $this->getAccessToken();
+        try {
+            $accessToken = $this->getAccessToken();
+        } catch (\Exception $e) {
+            $this->logger->error("❌ Erreur lors de la récupération du token IGDB: " . $e->getMessage());
+            throw $e;
+        }
 
+        // REQUÊTE CORRIGÉE : Suppression des champs problématiques
+        $requestBody = <<<EOT
+fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots, total_rating, total_rating_count, involved_companies.company.name, involved_companies.publisher, category, age_ratings, alternative_names.name, videos;
+where id = $gameId;
+limit 1;
+EOT;
+        $requestBody = $this->cleanBody($requestBody);
+        
         try {
             // Effectue une requête POST pour récupérer les détails du jeu
             $response = $this->client->request('POST', 'https://api.igdb.com/v4/games', [
@@ -406,13 +468,9 @@ EOT
                     'Authorization' => 'Bearer ' . $accessToken,
                     'Content-Type' => 'text/plain',
                 ],
-                'body' => <<<EOT
-                fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots, total_rating, total_rating_count, involved_companies.company.name, category;
-                where id = $gameId;
-                limit 1;
-                EOT
+                'body' => $requestBody
             ]);
-
+            
             $games = $response->toArray();
             
             if (empty($games)) {
@@ -432,10 +490,319 @@ EOT
             }
 
             return $game;
+            
         } catch (\Exception $e) {
-            error_log("Erreur lors de la récupération des détails du jeu {$gameId}: " . $e->getMessage());
+            $this->logger->error("❌ Erreur lors de la récupération des détails du jeu {$gameId}: " . $e->getMessage());
             return null;
         }
+    }
+
+    /**
+     * Test pour vérifier si les IDs "artworks" sont en fait des screenshots
+     */
+    public function testArtworksAsScreenshots(array $ids): array
+    {
+        // Filtrer les IDs pour ne garder que les entiers valides et uniques
+        $ids = array_unique(array_filter($ids, fn($id) => is_numeric($id) && (int)$id > 0));
+        if (empty($ids)) {
+            return [];
+        }
+
+        $accessToken = $this->getAccessToken();
+        $idsString = implode(',', $ids);
+
+        // Test avec l'endpoint screenshots
+        $requestBody = <<<EOT
+fields url;
+where id = ($idsString);
+EOT;
+        $requestBody = $this->cleanBody($requestBody);
+        
+        try {
+            $response = $this->client->request('POST', 'https://api.igdb.com/v4/screenshots', [
+                'headers' => [
+                    'Client-ID' => $this->clientId,
+                    'Authorization' => 'Bearer ' . $accessToken,
+                    'Content-Type' => 'text/plain',
+                ],
+                'body' => $requestBody
+            ]);
+
+            $screenshots = $response->toArray();
+            
+            // Améliore la qualité des images
+            foreach ($screenshots as &$screenshot) {
+                if (isset($screenshot['url'])) {
+                    $imageUrl = $screenshot['url'];
+                    if (strpos($imageUrl, '//') === 0) {
+                        $imageUrl = 'https:' . $imageUrl;
+                    }
+                    $screenshot['url'] = $this->improveImageQuality($imageUrl, 't_1080p');
+                }
+            }
+
+            return $screenshots;
+        } catch (\Exception $e) {
+            $this->logger->error("❌ Test artworks comme screenshots échoué : " . $e->getMessage());
+            return [];
+        }
+    }
+
+    public function getArtworks(array $ids): array
+    {
+        // Filtrer les IDs pour ne garder que les entiers valides et uniques
+        $ids = array_unique(array_filter($ids, fn($id) => is_numeric($id) && (int)$id > 0));
+        if (empty($ids)) {
+            return [];
+        }
+
+        $accessToken = $this->getAccessToken();
+        $idsString = implode(',', $ids);
+
+        // Récupération avec plus de champs pour avoir plus d'informations
+        $requestBody = <<<EOT
+            fields url, width, height, image_id;
+            where id = ($idsString);
+            limit 500;
+        EOT;
+        $requestBody = $this->cleanBody($requestBody);
+        
+        try {
+            $response = $this->client->request('POST', 'https://api.igdb.com/v4/artworks', [
+                'headers' => [
+                    'Client-ID' => $this->clientId,
+                    'Authorization' => 'Bearer ' . $accessToken,
+                    'Content-Type' => 'text/plain',
+                ],
+                'body' => $requestBody
+            ]);
+
+            $artworks = $response->toArray();
+            
+            // Améliore la qualité des artworks
+            foreach ($artworks as &$artwork) {
+                if (isset($artwork['url'])) {
+                    $imageUrl = $artwork['url'];
+                    if (strpos($imageUrl, '//') === 0) {
+                        $imageUrl = 'https:' . $imageUrl;
+                    }
+                    $artwork['url'] = $this->improveImageQuality($imageUrl, 't_1080p');
+                }
+            }
+
+            return $artworks;
+        } catch (\Exception $e) {
+            $this->logger->error("❌ Erreur lors de la récupération des artworks: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Récupère les artworks pour une liste de jeux par leurs IDs de jeu.
+     * Cette méthode peut récupérer plus d'artworks que getArtworks() car elle
+     * recherche directement par ID de jeu plutôt que par ID d'artwork.
+     *
+     * @param array $gameIds Les IDs des jeux pour lesquels récupérer les artworks
+     * @return array La liste des artworks avec leurs informations
+     */
+    public function getArtworksByGame(array $gameIds): array
+    {
+        // Filtrer les IDs pour ne garder que les entiers valides et uniques
+        $gameIds = array_unique(array_filter($gameIds, fn($id) => is_numeric($id) && (int)$id > 0));
+        if (empty($gameIds)) {
+            return [];
+        }
+
+        $accessToken = $this->getAccessToken();
+        $gameIdsString = implode(',', $gameIds);
+
+        // Récupération des artworks par ID de jeu
+        $requestBody = <<<EOT
+            fields url, width, height, image_id, game;
+            where game = ($gameIdsString);
+            limit 1000;
+        EOT;
+        $requestBody = $this->cleanBody($requestBody);
+        
+        try {
+            $response = $this->client->request('POST', 'https://api.igdb.com/v4/artworks', [
+                'headers' => [
+                    'Client-ID' => $this->clientId,
+                    'Authorization' => 'Bearer ' . $accessToken,
+                    'Content-Type' => 'text/plain',
+                ],
+                'body' => $requestBody
+            ]);
+
+            $artworks = $response->toArray();
+            
+            // Améliore la qualité des artworks
+            foreach ($artworks as &$artwork) {
+                if (isset($artwork['url'])) {
+                    $imageUrl = $artwork['url'];
+                    if (strpos($imageUrl, '//') === 0) {
+                        $imageUrl = 'https:' . $imageUrl;
+                    }
+                    $artwork['url'] = $this->improveImageQuality($imageUrl, 't_1080p');
+                }
+            }
+
+            return $artworks;
+        } catch (\Exception $e) {
+            $this->logger->error("❌ Erreur lors de la récupération des artworks par jeu: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Récupère les vidéos pour une liste d'IDs.
+     *
+     * @param array $ids Les IDs des vidéos à récupérer.
+     * @return array La liste des vidéos avec leurs informations.
+     */
+    public function getVideos(array $ids): array
+    {
+        if (empty($ids)) {
+            return [];
+        }
+
+        $accessToken = $this->getAccessToken();
+        $idsString = implode(',', $ids);
+
+        $requestBody = <<<EOT
+fields video_id, name;
+where id = ($idsString);
+EOT;
+        $requestBody = $this->cleanBody($requestBody);
+        try {
+            $response = $this->client->request('POST', 'https://api.igdb.com/v4/game_videos', [
+                'headers' => [
+                    'Client-ID' => $this->clientId,
+                    'Authorization' => 'Bearer ' . $accessToken,
+                    'Content-Type' => 'text/plain',
+                ],
+                'body' => $requestBody
+            ]);
+
+            $videos = $response->toArray();
+            
+            // Ajoute l'URL YouTube pour chaque vidéo
+            foreach ($videos as &$video) {
+                if (isset($video['video_id'])) {
+                    $video['url'] = "https://www.youtube.com/watch?v=" . $video['video_id'];
+                }
+            }
+
+            return $videos;
+        } catch (\Exception $e) {
+            $this->logger->error("❌ Erreur lors de la récupération des vidéos: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Récupère les classifications d'âge détaillées pour une liste d'IDs de jeux.
+     *
+     * @param array $gameIds Les IDs des jeux pour lesquels récupérer les classifications d'âge
+     * @return array Tableau associatif [game_id => [labels...]]
+     */
+    public function getAgeRatings(array $gameIds): array
+    {
+        // Filtrer les IDs pour ne garder que les entiers valides et uniques
+        $gameIds = array_unique(array_filter($gameIds, fn($id) => is_numeric($id) && (int)$id > 0));
+        if (empty($gameIds)) {
+            return [];
+        }
+
+        $accessToken = $this->getAccessToken();
+        $gameIdsString = implode(',', $gameIds);
+
+        // 1. Récupérer les IDs d'age_ratings pour chaque jeu
+        $requestBody = <<<EOT
+            fields id, age_ratings;
+            where id = ($gameIdsString);
+            limit 500;
+        EOT;
+        $requestBody = $this->cleanBody($requestBody);
+        try {
+            $response = $this->client->request('POST', 'https://api.igdb.com/v4/games', [
+                'headers' => [
+                    'Client-ID' => $this->clientId,
+                    'Authorization' => 'Bearer ' . $accessToken,
+                    'Content-Type' => 'text/plain',
+                ],
+                'body' => $requestBody
+            ]);
+            $games = $response->toArray();
+        } catch (\Exception $e) {
+            $this->logger->error("❌ Erreur lors de la récupération des jeux: " . $e->getMessage());
+            return [];
+        }
+
+        // Extraire tous les IDs d'age_ratings
+        $ageRatingIds = [];
+        $gameToAgeRatingIds = [];
+        foreach ($games as $game) {
+            if (isset($game['age_ratings']) && is_array($game['age_ratings'])) {
+                $gameToAgeRatingIds[$game['id']] = $game['age_ratings'];
+                foreach ($game['age_ratings'] as $arId) {
+                    $ageRatingIds[] = $arId;
+                }
+            }
+        }
+        $ageRatingIds = array_unique($ageRatingIds);
+        if (empty($ageRatingIds)) {
+            return [];
+        }
+
+        // 2. Récupérer les détails des age_ratings
+        $idsString = implode(',', $ageRatingIds);
+        $requestBody = <<<EOT
+            fields id, rating, category;
+            where id = ($idsString);
+            limit 500;
+        EOT;
+        $requestBody = $this->cleanBody($requestBody);
+        try {
+            $response = $this->client->request('POST', 'https://api.igdb.com/v4/age_ratings', [
+                'headers' => [
+                    'Client-ID' => $this->clientId,
+                    'Authorization' => 'Bearer ' . $accessToken,
+                    'Content-Type' => 'text/plain',
+                ],
+                'body' => $requestBody
+            ]);
+            $ageRatingsDetails = $response->toArray();
+        } catch (\Exception $e) {
+            $this->logger->error("❌ Erreur lors de la récupération des détails des classifications d'âge: " . $e->getMessage());
+            return [];
+        }
+
+        // Mapping id => label
+        $idToLabel = [];
+        foreach ($ageRatingsDetails as $ar) {
+            // On peut améliorer ici pour avoir PEGI/ESRB lisible
+            $label = $ar['rating'] ?? null;
+            if ($ar['category'] === 1) {
+                $label = 'ESRB ' . $label;
+            } elseif ($ar['category'] === 2) {
+                $label = 'PEGI ' . $label;
+            }
+            $idToLabel[$ar['id']] = $label;
+        }
+
+        // Associer chaque jeu à ses labels
+        $result = [];
+        foreach ($gameToAgeRatingIds as $gameId => $arIds) {
+            $labels = [];
+            foreach ($arIds as $arId) {
+                if (isset($idToLabel[$arId])) {
+                    $labels[] = $idToLabel[$arId];
+                }
+            }
+            $result[$gameId] = $labels;
+        }
+        return $result;
     }
 
     /**
