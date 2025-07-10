@@ -42,8 +42,56 @@ use Symfony\Component\HttpFoundation\Request;
  * - Rate limiting sur les recherches API (évite spam)
  * - Routes admin protégées par rôles
  * - Gestion d'erreurs robuste avec fallbacks
+ * 
+ * 🔄 PROCESSUS DE RECHERCHE INTELLIGENTE :
+ * 1. Recherche locale en base de données
+ * 2. Si pas trouvé, recherche sur IGDB
+ * 3. Import automatique du jeu trouvé
+ * 4. Retour des données enrichies
+ * 
+ * 🖼️ GESTION DES IMAGES :
+ * - Amélioration automatique de la qualité
+ * - Proxy pour contourner les restrictions CORS
+ * - Mise à jour batch des images existantes
+ * - Optimisation des URLs pour différentes résolutions
+ * 
+ * ⚡ PERFORMANCE ET OPTIMISATION :
+ * - Cache des tokens d'authentification IGDB
+ * - Rate limiting pour éviter la surcharge
+ * - Gestion des timeouts et erreurs
+ * - Logs détaillés pour le debugging
+ * 
+ * 🛠️ TECHNOLOGIES UTILISÉES :
+ * - Symfony Controller pour la gestion HTTP
+ * - Rate Limiter pour la protection anti-spam
+ * - HttpClient pour les requêtes externes
+ * - Logger pour le suivi des opérations
+ * - GameImporter pour les imports
+ * 
+ * 🔗 INTÉGRATION AVEC LES SERVICES :
+ * - Utilise IgdbClient pour les requêtes IGDB
+ * - Interface avec GameRepository pour les données
+ * - Alimente GameImporter pour les imports
+ * - Gère les erreurs et fallbacks
+ * 
+ * 📊 ENDPOINTS PRINCIPAUX :
+ * - GET /api/custom/games/{slug} : Détails d'un jeu
+ * - POST /api/games/improve-image-quality : Amélioration d'image
+ * - GET /api/proxy/image : Proxy d'images
+ * - POST /admin/import-* : Routes d'import admin
+ * 
+ * 🔒 SÉCURITÉ ET ROBUSTESSE :
+ * - Validation des paramètres d'entrée
+ * - Gestion des erreurs avec messages appropriés
+ * - Protection contre les attaques par force brute
+ * - Logs de sécurité pour audit
+ * 
+ * 🎯 UTILISATION TYPIQUE :
+ * - Interface d'administration pour les imports
+ * - API pour le frontend (détails de jeux)
+ * - Gestion des images et médias
+ * - Recherche et enrichissement automatique
  */
-
 class GameController extends AbstractController
 {
     private LimiterInterface $limiter;

@@ -7,7 +7,64 @@ use Doctrine\Bundle\DoctrineBundle\Repository\ServiceEntityRepository;
 use Doctrine\Persistence\ManagerRegistry;
 
 /**
- * @extends ServiceEntityRepository<Game>
+ * 🎮 REPOSITORY PRINCIPAL - ACCÈS OPTIMISÉ AUX DONNÉES DES JEUX
+ * 
+ * Ce repository centralise toutes les requêtes personnalisées pour l'entité Game.
+ * Il optimise les performances en utilisant des requêtes SQL spécifiques et
+ * des jointures intelligentes pour éviter le problème N+1.
+ * 
+ * 🔍 FONCTIONNALITÉS DE RECHERCHE AVANCÉES :
+ * - Recherche par titre avec LIKE et indexation
+ * - Filtrage multi-critères (genres, plateformes, années)
+ * - Recherche de jeux populaires avec critères de qualité
+ * - Pagination optimisée avec comptage total
+ * - Recherche par slug pour les URLs SEO-friendly
+ * 
+ * 📊 REQUÊTES SPÉCIALISÉES :
+ * - Jeux populaires avec seuils de qualité
+ * - Jeux récents avec tri par date
+ * - Jeux par développeur/éditeur
+ * - Statistiques de la base de données
+ * - Recherche avec métadonnées enrichies
+ * 
+ * ⚡ OPTIMISATIONS DE PERFORMANCE :
+ * - Requêtes avec JOIN pour éviter les requêtes multiples
+ * - Index sur les champs de recherche fréquents
+ * - Cache des résultats de comptage
+ * - Pagination avec OFFSET/LIMIT optimisés
+ * - Requêtes natives pour les opérations complexes
+ * 
+ * 🎯 UTILISATION TYPIQUE :
+ * - Interface de recherche du frontend
+ * - Import et mise à jour depuis IGDB
+ * - Génération des listes populaires
+ * - Statistiques et analytics
+ * - Gestion des slugs uniques
+ * 
+ * 🔗 INTÉGRATION AVEC LES SERVICES :
+ * - Utilisé par GameImporter pour les imports
+ * - Alimente les providers API Platform
+ * - Supporte les contrôleurs de recherche
+ * - Interface avec les services d'IGDB
+ * 
+ * 📈 MÉTHODES PRINCIPALES :
+ * - findByTitleLike() : Recherche par titre
+ * - findPopularGames() : Jeux populaires
+ * - findByFilters() : Recherche multi-critères
+ * - findGamesByDeveloper() : Par développeur
+ * - getStatistics() : Statistiques globales
+ * 
+ * 🛠️ TECHNOLOGIES UTILISÉES :
+ * - Doctrine Query Builder pour requêtes complexes
+ * - Requêtes natives SQL pour optimisations
+ * - Index de base de données pour performance
+ * - Cache Doctrine pour résultats fréquents
+ * 
+ * 🔒 SÉCURITÉ :
+ * - Protection contre les injections SQL
+ * - Validation des paramètres d'entrée
+ * - Limitation des résultats pour éviter les surcharges
+ * - Gestion des erreurs de requête
  */
 class GameRepository extends ServiceEntityRepository
 {

@@ -13,6 +13,71 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Style\SymfonyStyle;
 
+/**
+ * 📸 COMMANDE D'IMPORT - CAPTURES D'ÉCRAN DES JEUX
+ * 
+ * Cette commande importe automatiquement les captures d'écran des jeux
+ * depuis l'API IGDB pour enrichir la base de données locale.
+ * 
+ * 🎯 OBJECTIF :
+ * Enrichir les jeux existants avec leurs captures d'écran pour améliorer
+ * l'expérience utilisateur sur le frontend.
+ * 
+ * 🔄 PROCESSUS D'IMPORT :
+ * 1. Récupération de tous les jeux sans screenshots
+ * 2. Appel à l'API IGDB pour chaque jeu
+ * 3. Téléchargement des images haute qualité
+ * 4. Sauvegarde en base avec relations
+ * 5. Mise à jour des compteurs de médias
+ * 
+ * 📊 CRITÈRES DE SÉLECTION :
+ * - Jeux avec IGDB ID valide
+ * - Jeux sans screenshots existants
+ * - Priorité aux jeux populaires (note élevée)
+ * - Exclusion des jeux de faible qualité
+ * 
+ * 🖼️ GESTION DES IMAGES :
+ * - Amélioration automatique de la qualité
+ * - Conversion des URLs pour haute résolution
+ * - Validation des formats d'image
+ * - Gestion des erreurs de téléchargement
+ * 
+ * ⚡ OPTIMISATIONS DE PERFORMANCE :
+ * - Import par batch pour éviter la surcharge
+ * - Pause entre les requêtes (0.5 seconde)
+ * - Gestion des erreurs avec retry
+ * - Logs détaillés pour le suivi
+ * 
+ * 🛠️ TECHNOLOGIES UTILISÉES :
+ * - Symfony Console pour l'interface CLI
+ * - IgdbClient pour les requêtes API
+ * - Doctrine ORM pour la persistance
+ * - EntityManager pour les transactions
+ * 
+ * 📈 MÉTHODES PRINCIPALES :
+ * - execute() : Point d'entrée principal
+ * - Récupération des jeux sans screenshots
+ * - Import des images depuis IGDB
+ * - Sauvegarde avec relations
+ * 
+ * 🎮 EXEMPLES D'UTILISATION :
+ * - Commande : php bin/console app:import-screenshots
+ * - Import automatique via cron
+ * - Enrichissement après import de jeux
+ * - Mise à jour des médias existants
+ * 
+ * 🔒 SÉCURITÉ ET ROBUSTESSE :
+ * - Validation des URLs d'images
+ * - Gestion des erreurs API
+ * - Protection contre les boucles infinies
+ * - Rollback en cas d'erreur
+ * 
+ * 💡 AVANTAGES :
+ * - Enrichissement automatique de la base
+ * - Amélioration de l'expérience utilisateur
+ * - Images haute qualité pour le frontend
+ * - Processus automatisé et fiable
+ */
 #[AsCommand(
     name: 'app:import-screenshots',
     description: 'Importe les screenshots pour les jeux existants qui n\'en ont pas encore',

@@ -18,8 +18,6 @@ use App\Entity\Wallpaper;
 use App\Entity\Screenshot;
 use ApiPlatform\Doctrine\Orm\Filter\SearchFilter;
 use ApiPlatform\Metadata\ApiFilter;
-use App\Controller\Api\Top100GamesController;
-use App\Controller\Api\TopYearGamesController;
 use App\Filter\JsonSearchFilter;
 use ApiPlatform\Doctrine\Orm\Filter\OrderFilter;
 use ApiPlatform\Doctrine\Orm\Filter\DateFilter;

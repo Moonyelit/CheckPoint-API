@@ -33,7 +33,7 @@ services:
     # Une seule configuration du LoginController
     App\Controller\LoginController: ~
 
-    # Configuration pour le LoginRateLimiter
+    # Configuration pour le LoginRateLimiter avec RateLimiterFactory
     App\Security\LoginRateLimiter:
         arguments:
             $factory: '@limiter.login_limiter'

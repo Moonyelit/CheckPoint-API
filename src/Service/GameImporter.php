@@ -4,50 +4,90 @@ namespace App\Service;
 
 use App\Entity\Game;
 use App\Entity\Screenshot;
+use App\Entity\Artwork;
+use App\Entity\Video;
+use App\Entity\Wallpaper;
 use App\Repository\GameRepository;
 use Doctrine\ORM\EntityManagerInterface;
+use Psr\Log\LoggerInterface;
 use Cocur\Slugify\Slugify;
 
 /**
- * 📦 SERVICE GAME IMPORTER - IMPORTATION & SYNCHRONISATION DES JEUX
- *
- * Ce service gère l'importation, la mise à jour et la synchronisation des jeux vidéo
- * depuis l'API IGDB vers la base de données locale.
- *
- * 🔧 FONCTIONNALITÉS PRINCIPALES :
- *
- * 📥 IMPORTS MASSIFS & CIBLÉS :
- * - Import du Top 100 IGDB (classiques, AAA, populaires)
- * - Import des meilleurs jeux récents (année en cours)
- * - Import des jeux populaires (votes, notes)
- * - Import ciblé par recherche utilisateur
- *
- * 🔄 SYNCHRONISATION & MISE À JOUR :
- * - Mise à jour intelligente des jeux existants (notes, images, genres, etc.)
- * - Ajout des nouveaux jeux absents de la base
- * - Gestion des doublons via l'ID IGDB
- *
- * 🖼️ GESTION DES MÉDIAS :
- * - Téléchargement et association des images de couverture et screenshots
- * - Amélioration automatique de la qualité des images
- *
- * 🎯 UTILISATION :
- * - Utilisé par les commandes d'import, les endpoints d'admin et la recherche intelligente
- * - Permet d'enrichir la base locale pour accélérer les recherches et améliorer l'expérience utilisateur
- *
- * ⚡ EXEMPLES D'USAGE :
- * - Import hebdomadaire du Top 100 pour la homepage
- * - Import des nouveautés pour garder la base à jour
- * - Import à la volée lors d'une recherche utilisateur
- *
- * 💡 AVANTAGES :
- * - Base locale enrichie et cohérente
- * - Réduction des appels à IGDB en temps réel
- * - Expérience utilisateur plus fluide et rapide
- *
- * 🔧 UTILISATION RECOMMANDÉE :
- * - Pour toute opération d'import ou de synchronisation de jeux
- * - Pour garantir la fraîcheur et la qualité des données jeux
+ * 🚀 SERVICE D'IMPORT PRINCIPAL - GESTION COMPLÈTE DES IMPORTS IGDB
+ * 
+ * Ce service est le cœur de l'importation des données depuis l'API IGDB.
+ * Il gère l'ensemble du processus d'import : récupération, validation,
+ * transformation et sauvegarde des jeux vidéo avec leurs métadonnées.
+ * 
+ * 📥 FONCTIONNALITÉS D'IMPORT :
+ * - Import de jeux populaires avec critères de qualité
+ * - Import du Top 100 des meilleurs jeux de tous les temps
+ * - Import des jeux de l'année avec filtres temporels
+ * - Import de jeux par recherche avec enrichissement automatique
+ * - Import de médias associés (screenshots, artworks, vidéos)
+ * 
+ * 🔄 PROCESSUS D'IMPORT COMPLET :
+ * 1. Récupération des données depuis l'API IGDB
+ * 2. Validation et nettoyage des données
+ * 3. Transformation des formats (dates, URLs, etc.)
+ * 4. Génération des slugs uniques
+ * 5. Sauvegarde en base avec relations
+ * 6. Import des médias associés
+ * 7. Mise à jour des compteurs et statistiques
+ * 
+ * 🎯 CRITÈRES DE QUALITÉ :
+ * - Filtrage par note minimale (75-90 selon l'époque)
+ * - Filtrage par nombre de votes (50-500 selon l'époque)
+ * - Exclusion des jeux de faible qualité
+ * - Priorisation des jeux AAA et populaires
+ * - Nettoyage automatique des données aberrantes
+ * 
+ * 📊 MÉTADONNÉES GÉRÉES :
+ * - Informations de base : titre, développeur, éditeur
+ * - Classements : note globale, nombre de votes
+ * - Métadonnées : plateformes, genres, modes de jeu
+ * - Médias : couverture, screenshots, artworks, vidéos
+ * - Dates : sortie, création, mise à jour
+ * 
+ * ⚡ OPTIMISATIONS DE PERFORMANCE :
+ * - Import par batch pour éviter les surcharges
+ * - Cache des tokens d'authentification
+ * - Gestion des erreurs avec retry automatique
+ * - Pause entre les requêtes pour respecter les limites API
+ * - Transactions pour garantir la cohérence des données
+ * 
+ * 🔗 INTÉGRATION AVEC LES AUTRES SERVICES :
+ * - Utilise IgdbClient pour les requêtes API
+ * - Interface avec GameRepository pour les requêtes
+ * - Alimente les entités avec les données enrichies
+ * - Gère les relations avec les médias
+ * 
+ * 🛠️ TECHNOLOGIES UTILISÉES :
+ * - Symfony HttpClient pour les requêtes API
+ * - Doctrine ORM pour la persistance
+ * - Slugify pour la génération d'URLs
+ * - Logger pour le suivi des opérations
+ * - Transactions pour la cohérence
+ * 
+ * 🔒 SÉCURITÉ ET ROBUSTESSE :
+ * - Validation des données reçues
+ * - Gestion des erreurs API avec fallback
+ * - Protection contre les doublons
+ * - Limitation des appels API
+ * - Rollback en cas d'erreur
+ * 
+ * 📈 MÉTHODES PRINCIPALES :
+ * - importPopularGames() : Import des jeux populaires
+ * - importTop100Games() : Import du Top 100
+ * - importTopYearGames() : Import des jeux de l'année
+ * - importGameBySearch() : Import par recherche
+ * - importGameMedia() : Import des médias
+ * 
+ * 🎮 EXEMPLES D'UTILISATION :
+ * - Commande console : php bin/console app:import-top100-games
+ * - Import automatique via cron
+ * - Import à la demande depuis l'interface admin
+ * - Enrichissement lors de la recherche utilisateur
  */
 class GameImporter
 {
