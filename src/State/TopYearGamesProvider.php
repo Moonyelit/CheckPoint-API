@@ -41,6 +41,7 @@ class TopYearGamesProvider implements ProviderInterface
                 'id' => $game->getId(),
                 'title' => $game->getTitle(),
                 'name' => $game->getTitle(), // Compatibilité avec le front-end
+                'slug' => $game->getSlug(), // Ajout du slug pour la navigation
                 'coverUrl' => $improvedUrl,
                 'cover' => $improvedUrl ? ['url' => $improvedUrl] : null,
                 'releaseDate' => $game->getReleaseDate() ? $game->getReleaseDate()->format('Y-m-d') : null,

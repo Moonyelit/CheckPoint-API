@@ -42,6 +42,7 @@ class Top100GamesProvider implements ProviderInterface
                 'id' => $game->getId(),
                 'title' => $game->getTitle(),
                 'name' => $game->getTitle(), // Compatibilité avec le front-end
+                'slug' => $game->getSlug(), // Ajout du slug pour la navigation
                 'totalRating' => $game->getTotalRating(),
                 'total_rating' => $game->getTotalRating(), // Compatibilité avec le front-end
                 'platforms' => $game->getPlatforms() ? array_map(function($platform) {
