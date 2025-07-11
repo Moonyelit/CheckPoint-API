@@ -28,6 +28,8 @@ use ApiPlatform\Doctrine\Orm\Filter\DateFilter;
     operations: [
         // GET /api/games
         new GetCollection(),
+        // GET /api/games/{id}
+        new Get(),
 
         // Opérations CRUD réservées aux admins
         new Post(security: "is_granted('ROLE_ADMIN')"),
@@ -105,7 +107,6 @@ class Game
     private ?float $totalRating = null;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
-    #[Groups(['game:read', 'game:write'])]
     private ?string $summary = null;
 
     #[ORM\Column(length: 255, nullable: true)]
@@ -328,6 +329,7 @@ class Game
         return $this;
     }
 
+    #[Groups(['game:read'])]
     public function getSummary(): ?string
     {
         return $this->summary;

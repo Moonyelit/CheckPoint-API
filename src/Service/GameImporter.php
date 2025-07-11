@@ -682,7 +682,7 @@ class GameImporter
             if (isset($apiGame['summary'])) {
                 $game->setSummary($apiGame['summary']);
             }
-            
+
             if (array_key_exists('total_rating', $apiGame)) {
                 $game->setTotalRating($apiGame['total_rating']);
             }
