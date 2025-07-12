@@ -80,6 +80,7 @@ class ImportTop100GamesCommand extends Command
         $io->section('🧹 Nettoyage automatique des jeux de faible qualité');
         
         $connection = $this->entityManager->getConnection();
+        $deleted = 0; // Initialiser la variable
         
         // Compte les jeux à supprimer (moins de 100 votes ET pas mis à jour récemment)
         $lowQualityCount = $connection->executeQuery(
@@ -90,7 +91,7 @@ class ImportTop100GamesCommand extends Command
             $io->text("Suppression de $lowQualityCount jeux avec moins de 100 votes (pas mis à jour récemment)...");
             
             // Supprime d'abord les entités liées
-            $connection->executeStatement('DELETE FROM user_wallpaper WHERE wallpaper_id IN (SELECT id FROM wallpaper WHERE game_id IN (SELECT id FROM game WHERE (total_rating_count < 100 OR total_rating_count IS NULL) AND (updated_at IS NULL OR updated_at < DATE_SUB(NOW(), INTERVAL 1 DAY)))');
+            $connection->executeStatement('DELETE FROM user_wallpaper WHERE wallpaper_id IN (SELECT id FROM wallpaper WHERE game_id IN (SELECT id FROM game WHERE (total_rating_count < 100 OR total_rating_count IS NULL) AND (updated_at IS NULL OR updated_at < DATE_SUB(NOW(), INTERVAL 1 DAY))))');
             $connection->executeStatement('DELETE FROM screenshot WHERE game_id IN (SELECT id FROM game WHERE (total_rating_count < 100 OR total_rating_count IS NULL) AND (updated_at IS NULL OR updated_at < DATE_SUB(NOW(), INTERVAL 1 DAY)))');
             $connection->executeStatement('DELETE FROM wallpaper WHERE game_id IN (SELECT id FROM game WHERE (total_rating_count < 100 OR total_rating_count IS NULL) AND (updated_at IS NULL OR updated_at < DATE_SUB(NOW(), INTERVAL 1 DAY)))');
             $connection->executeStatement('DELETE FROM video WHERE game_id IN (SELECT id FROM game WHERE (total_rating_count < 100 OR total_rating_count IS NULL) AND (updated_at IS NULL OR updated_at < DATE_SUB(NOW(), INTERVAL 1 DAY)))');

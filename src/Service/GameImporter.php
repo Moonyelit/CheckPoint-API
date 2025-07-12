@@ -150,6 +150,15 @@ class GameImporter
                 $game->setTotalRating($apiGame['total_rating']);
             }
 
+            // Ajoute les notes détaillées calculées
+            if (isset($apiGame['detailed_ratings'])) {
+                $game->setDetailedRatings($apiGame['detailed_ratings']);
+            } else {
+                // Calculer les notes détaillées si elles ne sont pas fournies
+                $detailedRatings = $this->igdbClient->calculateDetailedRatings($apiGame);
+                $game->setDetailedRatings($detailedRatings);
+            }
+
             if (isset($apiGame['first_release_date'])) {
                 $game->setReleaseDate((new \DateTime())->setTimestamp($apiGame['first_release_date']));
             }
@@ -306,6 +315,15 @@ class GameImporter
 
             if (array_key_exists('total_rating', $apiGame)) {
                 $game->setTotalRating($apiGame['total_rating']);
+            }
+
+            // Ajoute les notes détaillées calculées
+            if (isset($apiGame['detailed_ratings'])) {
+                $game->setDetailedRatings($apiGame['detailed_ratings']);
+            } else {
+                // Calculer les notes détaillées si elles ne sont pas fournies
+                $detailedRatings = $this->igdbClient->calculateDetailedRatings($apiGame);
+                $game->setDetailedRatings($detailedRatings);
             }
 
             if (isset($apiGame['first_release_date'])) {
@@ -514,6 +532,15 @@ class GameImporter
             $game->setCategory($apiGame['category']);
         }
 
+        // Ajoute les notes détaillées calculées
+        if (isset($apiGame['detailed_ratings'])) {
+            $game->setDetailedRatings($apiGame['detailed_ratings']);
+        } else {
+            // Calculer les notes détaillées si elles ne sont pas fournies
+            $detailedRatings = $this->igdbClient->calculateDetailedRatings($apiGame);
+            $game->setDetailedRatings($detailedRatings);
+        }
+
         if (isset($apiGame['first_release_date'])) {
             $game->setReleaseDate((new \DateTime())->setTimestamp($apiGame['first_release_date']));
         }
@@ -687,57 +714,6 @@ class GameImporter
                 $game->setTotalRating($apiGame['total_rating']);
             }
 
-            if (isset($apiGame['first_release_date'])) {
-                $game->setReleaseDate((new \DateTime())->setTimestamp($apiGame['first_release_date']));
-            }
-
-            if (isset($apiGame['genres'])) {
-                $genres = array_map(fn($genre) => $genre['name'], $apiGame['genres']);
-                $game->setGenres($genres);
-            }
-
-            if (isset($apiGame['platforms'])) {
-                $platforms = array_map(fn($platform) => $platform['name'], $apiGame['platforms']);
-                $game->setPlatforms($platforms);
-            }
-
-            if (isset($apiGame['game_modes'])) {
-                $gameModes = array_map(fn($mode) => $mode['name'], $apiGame['game_modes']);
-                $game->setGameModes($gameModes);
-            }
-
-            if (isset($apiGame['player_perspectives'])) {
-                $perspectives = array_map(fn($perspective) => $perspective['name'], $apiGame['player_perspectives']);
-                $game->setPerspectives($perspectives);
-            }
-
-            if (isset($apiGame['involved_companies'][0]['company']['name'])) {
-                $game->setDeveloper($apiGame['involved_companies'][0]['company']['name']);
-            }
-
-            if (isset($apiGame['cover']['url'])) {
-                $imageUrl = $apiGame['cover']['url'];
-                if (strpos($imageUrl, '//') === 0) {
-                    $imageUrl = 'https:' . $imageUrl;
-                }
-                $highQualityUrl = $this->igdbClient->improveImageQuality($imageUrl, 't_cover_big');
-                $game->setCoverUrl($highQualityUrl);
-            }
-
-            if (isset($apiGame['screenshots']) && is_array($apiGame['screenshots'])) {
-                $screenshotData = $this->igdbClient->getScreenshots($apiGame['screenshots']);
-                foreach ($screenshotData as $data) {
-                    $screenshot = new Screenshot();
-                    $imageUrl = $data['url'];
-                    if (strpos($imageUrl, '//') === 0) {
-                        $imageUrl = 'https:' . $imageUrl;
-                    }
-                    $screenshot->setImage($imageUrl);
-                    $screenshot->setGame($game);
-                    $game->addScreenshot($screenshot);
-                }
-            }
-
             // Ajout des statistiques de rating et popularité
             if (array_key_exists('total_rating_count', $apiGame)) {
                 $game->setTotalRatingCount($apiGame['total_rating_count']);
@@ -830,6 +806,15 @@ class GameImporter
 
             if (array_key_exists('total_rating', $apiGame)) {
                 $game->setTotalRating($apiGame['total_rating']);
+            }
+
+            // Ajoute les notes détaillées calculées
+            if (isset($apiGame['detailed_ratings'])) {
+                $game->setDetailedRatings($apiGame['detailed_ratings']);
+            } else {
+                // Calculer les notes détaillées si elles ne sont pas fournies
+                $detailedRatings = $this->igdbClient->calculateDetailedRatings($apiGame);
+                $game->setDetailedRatings($detailedRatings);
             }
 
             if (isset($apiGame['first_release_date'])) {

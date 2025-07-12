@@ -170,6 +170,13 @@ class Game
     private ?int $videosCount = null;
 
     /**
+     * Notes détaillées calculées pour le radar chart
+     */
+    #[ORM\Column(type: Types::JSON, nullable: true)]
+    #[Groups(['game:read', 'game:write'])]
+    private ?array $detailedRatings = null;
+
+    /**
      * @var Collection<int, Artwork>
      */
     #[ORM\OneToMany(mappedBy: 'game', targetEntity: Artwork::class, cascade: ['persist', 'remove'], orphanRemoval: true)]
@@ -567,6 +574,24 @@ class Game
     public function setVideosCount(?int $videosCount): static
     {
         $this->videosCount = $videosCount;
+
+        return $this;
+    }
+
+    /**
+     * Récupère les notes détaillées calculées pour le radar chart
+     */
+    public function getDetailedRatings(): ?array
+    {
+        return $this->detailedRatings;
+    }
+
+    /**
+     * Définit les notes détaillées calculées pour le radar chart
+     */
+    public function setDetailedRatings(?array $detailedRatings): static
+    {
+        $this->detailedRatings = $detailedRatings;
 
         return $this;
     }

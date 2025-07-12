@@ -171,6 +171,9 @@ EOT;
                 }
                 $game['cover']['url'] = $this->improveImageQuality($imageUrl, 't_cover_big');
             }
+            
+            // Ajoute les notes détaillées calculées
+            $game['detailed_ratings'] = $this->calculateDetailedRatings($game);
         }
 
         // Retourne les résultats sous forme de tableau
@@ -488,6 +491,9 @@ EOT;
                 }
                 $game['cover']['url'] = $this->improveImageQuality($imageUrl, 't_cover_big');
             }
+
+            // Ajoute les notes détaillées calculées
+            $game['detailed_ratings'] = $this->calculateDetailedRatings($game);
 
             return $game;
             
@@ -911,5 +917,208 @@ EOT;
         } catch (\Throwable $e) {
             return 0;
         }
+    }
+
+    /**
+     * Calcule des notes détaillées pour le radar chart basées sur les données IGDB.
+     * 
+     * @param array $game Les données du jeu depuis IGDB
+     * @return array Les notes calculées pour chaque critère
+     */
+    public function calculateDetailedRatings(array $game): array
+    {
+        $ratings = [
+            'jouabilite' => 0,
+            'gameplay' => 0,
+            'musique' => 0,
+            'histoire' => 0,
+            'graphisme' => 0
+        ];
+
+        // Note de base basée sur total_rating
+        $baseRating = $game['total_rating'] ?? 0;
+        $ratingCount = $game['total_rating_count'] ?? 0;
+
+        // Si pas de note, on ne peut pas calculer
+        if ($baseRating <= 0) {
+            return $ratings;
+        }
+
+        // Facteurs de pondération basés sur les genres et caractéristiques du jeu
+        $genreFactors = $this->getGenreFactors($game);
+        $platformFactors = $this->getPlatformFactors($game);
+        $categoryFactors = $this->getCategoryFactors($game);
+
+        // Calcul des notes détaillées
+        $ratings['jouabilite'] = $this->calculateJouabiliteRating($baseRating, $genreFactors, $platformFactors);
+        $ratings['gameplay'] = $this->calculateGameplayRating($baseRating, $genreFactors, $categoryFactors);
+        $ratings['musique'] = $this->calculateMusiqueRating($baseRating, $genreFactors);
+        $ratings['histoire'] = $this->calculateHistoireRating($baseRating, $genreFactors);
+        $ratings['graphisme'] = $this->calculateGraphismeRating($baseRating, $platformFactors, $categoryFactors);
+
+        // Normalisation des notes (0-100)
+        foreach ($ratings as $key => $rating) {
+            $ratings[$key] = min(100, max(0, round($rating)));
+        }
+
+        return $ratings;
+    }
+
+    /**
+     * Calcule les facteurs de pondération basés sur les genres.
+     */
+    private function getGenreFactors(array $game): array
+    {
+        $genres = array_map(fn($g) => strtolower($g['name'] ?? ''), $game['genres'] ?? []);
+        
+        return [
+            'action' => in_array('action', $genres),
+            'rpg' => in_array('role-playing', $genres),
+            'strategy' => in_array('strategy', $genres),
+            'adventure' => in_array('adventure', $genres),
+            'sports' => in_array('sports', $genres),
+            'racing' => in_array('racing', $genres),
+            'fighting' => in_array('fighting', $genres),
+            'shooter' => in_array('shooter', $genres),
+            'puzzle' => in_array('puzzle', $genres),
+            'simulation' => in_array('simulation', $genres),
+        ];
+    }
+
+    /**
+     * Calcule les facteurs de pondération basés sur les plateformes.
+     */
+    private function getPlatformFactors(array $game): array
+    {
+        $platforms = array_map(fn($p) => strtolower($p['name'] ?? ''), $game['platforms'] ?? []);
+        
+        return [
+            'pc' => in_array('pc (microsoft windows)', $platforms),
+            'ps5' => in_array('playstation 5', $platforms),
+            'ps4' => in_array('playstation 4', $platforms),
+            'xbox' => in_array('xbox series x|s', $platforms) || in_array('xbox one', $platforms),
+            'nintendo' => in_array('nintendo switch', $platforms) || in_array('wii u', $platforms),
+            'mobile' => in_array('android', $platforms) || in_array('ios', $platforms),
+        ];
+    }
+
+    /**
+     * Calcule les facteurs de pondération basés sur la catégorie du jeu.
+     */
+    private function getCategoryFactors(array $game): array
+    {
+        $category = $game['category'] ?? 0;
+        
+        return [
+            'main_game' => $category === 0,
+            'dlc' => $category === 1,
+            'expansion' => $category === 2,
+            'bundle' => $category === 3,
+            'standalone_expansion' => $category === 4,
+            'mod' => $category === 5,
+            'episode' => $category === 6,
+            'season' => $category === 7,
+        ];
+    }
+
+    /**
+     * Calcule la note de jouabilité.
+     */
+    private function calculateJouabiliteRating(float $baseRating, array $genreFactors, array $platformFactors): float
+    {
+        $rating = $baseRating;
+        
+        // Bonus pour les genres orientés gameplay
+        if ($genreFactors['action']) $rating += 5;
+        if ($genreFactors['fighting']) $rating += 8;
+        if ($genreFactors['sports']) $rating += 6;
+        if ($genreFactors['racing']) $rating += 7;
+        
+        // Bonus pour les plateformes modernes
+        if ($platformFactors['ps5'] || $platformFactors['xbox']) $rating += 3;
+        if ($platformFactors['pc']) $rating += 2;
+        
+        return $rating;
+    }
+
+    /**
+     * Calcule la note de gameplay.
+     */
+    private function calculateGameplayRating(float $baseRating, array $genreFactors, array $categoryFactors): float
+    {
+        $rating = $baseRating;
+        
+        // Bonus pour les genres avec gameplay complexe
+        if ($genreFactors['rpg']) $rating += 7;
+        if ($genreFactors['strategy']) $rating += 8;
+        if ($genreFactors['shooter']) $rating += 6;
+        if ($genreFactors['puzzle']) $rating += 4;
+        
+        // Malus pour les DLC/expansions
+        if ($categoryFactors['dlc'] || $categoryFactors['expansion']) $rating -= 5;
+        
+        return $rating;
+    }
+
+    /**
+     * Calcule la note de musique/OST.
+     */
+    private function calculateMusiqueRating(float $baseRating, array $genreFactors): float
+    {
+        $rating = $baseRating;
+        
+        // Bonus pour les genres avec musique importante
+        if ($genreFactors['rpg']) $rating += 10;
+        if ($genreFactors['adventure']) $rating += 8;
+        if ($genreFactors['racing']) $rating += 6;
+        
+        // Malus pour les genres moins musicaux
+        if ($genreFactors['puzzle']) $rating -= 5;
+        if ($genreFactors['simulation']) $rating -= 3;
+        
+        return $rating;
+    }
+
+    /**
+     * Calcule la note d'histoire.
+     */
+    private function calculateHistoireRating(float $baseRating, array $genreFactors): float
+    {
+        $rating = $baseRating;
+        
+        // Bonus pour les genres narratifs
+        if ($genreFactors['rpg']) $rating += 12;
+        if ($genreFactors['adventure']) $rating += 10;
+        if ($genreFactors['action']) $rating += 3;
+        
+        // Malus pour les genres sans histoire
+        if ($genreFactors['sports']) $rating -= 8;
+        if ($genreFactors['racing']) $rating -= 6;
+        if ($genreFactors['puzzle']) $rating -= 10;
+        if ($genreFactors['fighting']) $rating -= 5;
+        
+        return $rating;
+    }
+
+    /**
+     * Calcule la note de graphisme.
+     */
+    private function calculateGraphismeRating(float $baseRating, array $platformFactors, array $categoryFactors): float
+    {
+        $rating = $baseRating;
+        
+        // Bonus pour les plateformes modernes
+        if ($platformFactors['ps5'] || $platformFactors['xbox']) $rating += 8;
+        if ($platformFactors['ps4']) $rating += 5;
+        if ($platformFactors['pc']) $rating += 6;
+        
+        // Malus pour les plateformes moins puissantes
+        if ($platformFactors['mobile']) $rating -= 10;
+        if ($platformFactors['nintendo']) $rating -= 3;
+        
+        // Malus pour les DLC/expansions (réutilisent les assets)
+        if ($categoryFactors['dlc'] || $categoryFactors['expansion']) $rating -= 3;
+        
+        return $rating;
     }
 }
