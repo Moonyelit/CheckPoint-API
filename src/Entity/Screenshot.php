@@ -31,7 +31,7 @@ class Screenshot
     private ?int $id = null;
 
     #[ORM\Column(length: 255, nullable: true)]
-    #[Groups(['screenshot:read', 'screenshot:write'])]
+    #[Groups(['screenshot:read', 'screenshot:write', 'game:read'])]
     private ?string $image = null;
 
     #[ORM\ManyToOne(inversedBy: 'screenshots')]

@@ -415,6 +415,7 @@ class Game
     /**
      * @return Collection<int, Screenshot>
      */
+    #[Groups(['game:read'])]
     public function getScreenshots(): Collection
     {
         return $this->screenshots;
@@ -626,6 +627,7 @@ class Game
     /**
      * @return Collection<int, Video>
      */
+    #[Groups(['game:read'])]
     public function getVideos(): Collection
     {
         return $this->videos;

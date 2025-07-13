@@ -37,7 +37,7 @@ class Video
     private ?string $videoId = null;
 
     #[ORM\Column(length: 255)]
-    #[Groups(['video:read', 'video:write'])]
+    #[Groups(['video:read', 'video:write', 'game:read'])]
     private ?string $url = null;
 
     #[ORM\ManyToOne(inversedBy: 'videos')]
