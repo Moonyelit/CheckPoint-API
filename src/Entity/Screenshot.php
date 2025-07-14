@@ -78,6 +78,10 @@ class Screenshot
         // Décoder l'URL si elle est encodée
         $decodedUrl = urldecode($this->image);
         
+        // Nettoyer les protocoles dupliqués (https://https:// ou http://https://)
+        $decodedUrl = preg_replace('/^https?:\/\/https?:\/\/?/', 'https://', $decodedUrl);
+        $decodedUrl = preg_replace('/^https?:\/\/http:\/\/?/', 'https://', $decodedUrl);
+        
         // S'assurer que l'URL a le bon format
         if (strpos($decodedUrl, '//') === 0) {
             $decodedUrl = 'https:' . $decodedUrl;
