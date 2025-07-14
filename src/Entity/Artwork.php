@@ -25,19 +25,19 @@ class Artwork
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['artwork:read'])]
+    #[Groups(['artwork:read', 'game:read'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 255)]
-    #[Groups(['artwork:read', 'artwork:write'])]
+    #[Groups(['artwork:read', 'artwork:write', 'game:read'])]
     private ?string $url = null;
 
     #[ORM\Column(length: 255, nullable: true)]
-    #[Groups(['artwork:read', 'artwork:write'])]
+    #[Groups(['artwork:read', 'artwork:write', 'game:read'])]
     private ?string $title = null;
 
     #[ORM\Column(length: 255, nullable: true)]
-    #[Groups(['artwork:read', 'artwork:write'])]
+    #[Groups(['artwork:read', 'artwork:write', 'game:read'])]
     private ?string $type = null; // cover, screenshot, concept art, etc.
 
     #[ORM\ManyToOne(inversedBy: 'artworks')]
