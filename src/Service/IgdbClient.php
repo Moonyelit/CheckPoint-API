@@ -134,7 +134,6 @@ class IgdbClient
             throw $e;
         }
 
-        // REQUÊTE CORRIGÉE : Suppression des champs problématiques et simplification
         $requestBody = <<<EOT
 fields name, summary, cover.url, first_release_date, genres.name, platforms.name, game_modes.name, player_perspectives.name, screenshots, artworks, total_rating, total_rating_count, involved_companies.company.name, involved_companies.publisher, category, alternative_names.name, release_dates.platform.name, release_dates.date, videos, age_ratings;
 search "$search";

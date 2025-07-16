@@ -194,6 +194,50 @@ class GameRepository extends ServiceEntityRepository
     }
 
     /**
+     * Retourne les jeux avec critères configurables.
+     * Permet de filtrer par note minimum et nombre de votes minimum.
+     *
+     * @param int $minVotes Nombre minimum de votes
+     * @param int $minRating Note minimum (sur 100)
+     * @param int $limit Nombre maximum de résultats
+     * @return Game[]
+     */
+    public function findTopGamesWithCriteria(int $minVotes = 80, int $minRating = 75, int $limit = 100): array
+    {
+        return $this->createQueryBuilder('g')
+            ->andWhere('g.totalRating IS NOT NULL')
+            ->andWhere('g.totalRating >= :minRating')
+            ->andWhere('g.totalRatingCount >= :minVotes')
+            ->setParameter('minRating', $minRating)
+            ->setParameter('minVotes', $minVotes)
+            ->orderBy('g.totalRating', 'DESC')
+            ->addOrderBy('g.totalRatingCount', 'DESC')
+            ->setMaxResults($limit)
+            ->getQuery()
+            ->getResult();
+    }
+
+    /**
+     * Compte le nombre total de jeux correspondant aux critères.
+     *
+     * @param int $minVotes Nombre minimum de votes
+     * @param int $minRating Note minimum (sur 100)
+     * @return int
+     */
+    public function countTopGamesWithCriteria(int $minVotes = 80, int $minRating = 75): int
+    {
+        return $this->createQueryBuilder('g')
+            ->select('COUNT(g.id)')
+            ->andWhere('g.totalRating IS NOT NULL')
+            ->andWhere('g.totalRating >= :minRating')
+            ->andWhere('g.totalRatingCount >= :minVotes')
+            ->setParameter('minRating', $minRating)
+            ->setParameter('minVotes', $minVotes)
+            ->getQuery()
+            ->getSingleScalarResult();
+    }
+
+    /**
      * Retourne les meilleurs jeux sortis dans les 365 derniers jours.
      * Trie par totalRating décroissant.
      *
